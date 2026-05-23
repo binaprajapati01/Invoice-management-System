@@ -1,0 +1,145 @@
+import { useEffect, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Eye, FileUp, LayoutTemplate, Pencil, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { useAppStore } from "../store/appStore.js";
+import { PageHeader } from "../components/ui.jsx";
+import CrudModal from "../components/CrudModal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import Skeleton from "../components/Skeleton.jsx";
+
+const schema = z.object({
+  name: z.string().min(2),
+  category: z.string().min(2),
+  description: z.string().optional(),
+  accentColor: z.string().min(4),
+  thumbnail: z.string().optional()
+});
+
+export default function TemplatesPage() {
+  const { templates, loading, fetchTemplates, saveTemplate, deleteTemplate, uploadFile } = useAppStore();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    fetchTemplates().catch((error) => toast.error(error.message));
+  }, []);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Reusable invoice design"
+        title="Invoice Templates"
+        description="Upload designs, map dynamic fields, preview layouts, and publish reusable branded invoice templates."
+        action={<button className="premium-btn" onClick={() => { setEditing(null); setOpen(true); }}><FileUp className="h-4 w-4" /> Upload template</button>}
+      />
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-4 md:grid-cols-3">
+          {loading.templates ? <div className="col-span-full"><Skeleton /></div> : templates.map((template) => (
+            <div key={template._id} className="group premium-card overflow-hidden p-0">
+              <div className="h-44 p-5" style={{ background: `linear-gradient(135deg, ${template.accentColor || "#2563EB"}22, #ffffff)` }}>
+                {template.thumbnail ? <img className="h-full w-full rounded-2xl object-cover shadow-soft" src={template.thumbnail} alt={template.name} /> : (
+                  <div className="h-full rounded-2xl border border-white/70 bg-white/86 p-4 shadow-soft">
+                    <div className="h-3 w-24 rounded-full" style={{ backgroundColor: template.accentColor || "#2563EB" }} />
+                    <div className="mt-8 space-y-2"><div className="h-2 w-3/4 rounded-full bg-slate-200" /><div className="h-2 w-2/3 rounded-full bg-slate-200" /><div className="h-2 w-5/6 rounded-full bg-slate-200" /></div>
+                    <div className="mt-8 grid grid-cols-3 gap-2"><div className="h-12 rounded-xl bg-slate-100" /><div className="h-12 rounded-xl bg-slate-100" /><div className="h-12 rounded-xl bg-slate-100" /></div>
+                  </div>
+                )}
+              </div>
+              <div className="p-5">
+                <p className="premium-label">{template.category}</p>
+                <h3 className="mt-2 text-lg font-black">{template.name}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{template.description || "Reusable invoice template"}</p>
+                <div className="mt-5 flex gap-2">
+                  <button className="secondary-btn flex-1 px-3 py-2" onClick={() => setPreview(template)}><Eye className="h-4 w-4" /> Preview</button>
+                  <button className="secondary-btn px-3 py-2" onClick={() => { setEditing(template); setOpen(true); }}><Pencil className="h-4 w-4" /></button>
+                  <button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(template)}><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!loading.templates && !templates.length && <p className="col-span-full py-12 text-center text-slate-500">No templates uploaded yet.</p>}
+        </div>
+        <aside className="premium-card">
+          <LayoutTemplate className="h-8 w-8 text-blue-600" />
+          <h2 className="mt-4 text-xl font-black">Dynamic field mapping</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Template field definitions are stored with each template and can be used by the invoice renderer and PDF generator.</p>
+          <div className="mt-6 space-y-3">
+            {["{{invoice.number}}", "{{client.name}}", "{{items.table}}", "{{tax.total}}", "{{payment.qr}}"].map((field) => <div key={field} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-950">{field}</div>)}
+          </div>
+        </aside>
+      </div>
+
+      <TemplateForm open={open} template={editing} uploadFile={uploadFile} onClose={() => setOpen(false)} onSave={async (values) => {
+        try {
+          await saveTemplate({ ...values, fields: [{ label: "Invoice Number", key: "invoiceNumber", required: true }, { label: "Items", key: "items", required: true }] }, editing?._id);
+          toast.success(editing ? "Template updated" : "Template created");
+          setOpen(false);
+        } catch (error) {
+          toast.error(error.message);
+        }
+      }} />
+      <CrudModal open={Boolean(preview)} title={preview?.name} onClose={() => setPreview(null)}>
+        <div className="rounded-2xl border border-slate-200 p-6 dark:border-slate-800">
+          <p className="premium-label">{preview?.category}</p>
+          <p className="mt-3 text-sm text-slate-500">{preview?.description}</p>
+          <div className="mt-6 rounded-2xl bg-slate-50 p-6 dark:bg-slate-900">
+            <div className="h-3 w-32 rounded-full" style={{ backgroundColor: preview?.accentColor }} />
+            <div className="mt-8 grid gap-3"><div className="h-4 rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-4 w-3/4 rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-24 rounded-2xl bg-white dark:bg-slate-950" /></div>
+          </div>
+        </div>
+      </CrudModal>
+      <ConfirmDialog open={Boolean(deleting)} title="Delete template" description={`Delete ${deleting?.name}?`} busy={loading.templates} onCancel={() => setDeleting(null)} onConfirm={async () => {
+        try {
+          await deleteTemplate(deleting._id);
+          toast.success("Template deleted");
+          setDeleting(null);
+        } catch (error) {
+          toast.error(error.message);
+        }
+      }} />
+    </>
+  );
+}
+
+function TemplateForm({ open, template, uploadFile, onClose, onSave }) {
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: template || { category: "Business", accentColor: "#2563EB" } });
+
+  useEffect(() => {
+    reset(template || { name: "", category: "Business", description: "", accentColor: "#2563EB", thumbnail: "" });
+  }, [template, reset, open]);
+
+  const upload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = await uploadFile(file);
+      setValue("thumbnail", data.url);
+      toast.success("Template image uploaded");
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  return (
+    <CrudModal open={open} title={template ? "Edit template" : "Upload template"} onClose={onClose}>
+      <form onSubmit={handleSubmit(onSave)} className="grid gap-4 md:grid-cols-2">
+        <Field label="Name" error={errors.name?.message}><input className="premium-input" {...register("name")} /></Field>
+        <Field label="Category" error={errors.category?.message}><input className="premium-input" {...register("category")} /></Field>
+        <Field label="Accent color"><input className="premium-input" type="color" {...register("accentColor")} /></Field>
+        <label className="secondary-btn mt-6 cursor-pointer"><FileUp className="h-4 w-4" /> Upload thumbnail<input className="hidden" type="file" accept="image/*" onChange={upload} /></label>
+        <label className="block md:col-span-2"><span className="premium-label">Description</span><textarea className="premium-input mt-2 min-h-24" {...register("description")} /></label>
+        <input type="hidden" {...register("thumbnail")} />
+        <div className="flex justify-end gap-3 md:col-span-2"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="premium-btn" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save template"}</button></div>
+      </form>
+    </CrudModal>
+  );
+}
+
+function Field({ label, error, children }) {
+  return <label className="block"><span className="premium-label">{label}</span><div className="mt-2">{children}</div>{error && <span className="mt-1 block text-xs font-semibold text-rose-500">{error}</span>}</label>;
+}
