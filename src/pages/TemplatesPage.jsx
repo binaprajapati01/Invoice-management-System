@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,8 +15,70 @@ const schema = z.object({
   category: z.string().min(2),
   description: z.string().optional(),
   accentColor: z.string().min(4),
-  thumbnail: z.string().optional()
+  thumbnail: z.string().optional(),
+  htmlContent: z.string().optional()
 });
+
+const sampleData = {
+  "{{invoice.number}}": "INV-2025-00001",
+  "{{invoice.date}}": "2025-01-15",
+  "{{invoice.dueDate}}": "2025-01-30",
+  "{{invoice.status}}": "Paid",
+  "{{invoice.currency}}": "INR",
+  "{{invoice.subtotal}}": "10,000.00",
+  "{{invoice.tax}}": "1,800.00",
+  "{{invoice.discount}}": "500.00",
+  "{{invoice.total}}": "11,300.00",
+  "{{client.name}}": "Acme Corp",
+  "{{client.email}}": "billing@acme.com",
+  "{{client.address}}": "123 Business Park, Mumbai",
+  "{{client.taxId}}": "GSTIN12345",
+  "{{company.name}}": "My Company Ltd",
+  "{{company.email}}": "hello@mycompany.com",
+  "{{company.address}}": "456 Tech Hub, Bangalore",
+  "{{items.table}}": "<table style=\"width:100%;border-collapse:collapse\"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody><tr><td>Design Service</td><td>2</td><td>5,000</td><td>10,000</td></tr></tbody></table>",
+  "{{bank.name}}": "HDFC Bank",
+  "{{bank.accountNo}}": "1234567890",
+  "{{bank.ifsc}}": "HDFC0001234",
+  "{{payment.qr}}": "<img src=\"https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=upi://pay\" />"
+};
+
+const defaultHtmlTemplate = `<div style="font-family:Inter,Arial,sans-serif;padding:32px;color:#111827">
+  <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding-bottom:20px">
+    <div>
+      <h1 style="margin:0;font-size:28px">{{company.name}}</h1>
+      <p style="margin:6px 0;color:#6b7280">{{company.email}}</p>
+      <p style="margin:0;color:#6b7280">{{company.address}}</p>
+    </div>
+    <div style="text-align:right">
+      <h2 style="margin:0;color:#2563eb;font-size:32px">INVOICE</h2>
+      <p style="font-weight:700">{{invoice.number}}</p>
+      <p>{{invoice.status}}</p>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:28px 0">
+    <div>
+      <p style="font-size:12px;text-transform:uppercase;color:#6b7280">Bill to</p>
+      <h3>{{client.name}}</h3>
+      <p>{{client.email}}</p>
+      <p>{{client.address}}</p>
+      <p>{{client.taxId}}</p>
+    </div>
+    <div>
+      <p><strong>Date:</strong> {{invoice.date}}</p>
+      <p><strong>Due:</strong> {{invoice.dueDate}}</p>
+      <p><strong>Currency:</strong> {{invoice.currency}}</p>
+    </div>
+  </div>
+  {{items.table}}
+  <div style="margin-top:24px;text-align:right">
+    <p>Subtotal: {{invoice.subtotal}}</p>
+    <p>Tax: {{invoice.tax}}</p>
+    <h2>Total: {{invoice.currency}} {{invoice.total}}</h2>
+  </div>
+</div>`;
+
+const templateFormDefaults = { name: "", category: "Business", description: "", accentColor: "#2563EB", thumbnail: "", htmlContent: defaultHtmlTemplate };
 
 export default function TemplatesPage() {
   const { templates, loading, fetchTemplates, saveTemplate, deleteTemplate, uploadFile } = useAppStore();
@@ -136,7 +198,7 @@ export default function TemplatesPage() {
 
       <TemplateForm open={open} template={editing} uploadFile={uploadFile} onClose={() => setOpen(false)} onSave={async (values) => {
         try {
-          await saveTemplate({ ...values, fields: [{ label: "Invoice Number", key: "invoiceNumber", required: true }, { label: "Items", key: "items", required: true }] }, editing?._id);
+          await saveTemplate({ ...values, templateType: "html", fields: [{ label: "Invoice Number", key: "invoiceNumber", required: true }, { label: "Items", key: "items", required: true }] }, editing?._id);
           toast.success(editing ? "Template updated" : "Template created");
           setOpen(false);
         } catch (error) {
@@ -167,10 +229,12 @@ export default function TemplatesPage() {
 }
 
 function TemplateForm({ open, template, uploadFile, onClose, onSave }) {
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: template || { category: "Business", accentColor: "#2563EB" } });
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm({ resolver: zodResolver(schema), defaultValues: template ? { ...templateFormDefaults, ...template, htmlContent: template.htmlContent || defaultHtmlTemplate } : templateFormDefaults });
+  const htmlContent = watch("htmlContent");
+  const renderedPreview = useMemo(() => renderSampleHtml(htmlContent || ""), [htmlContent]);
 
   useEffect(() => {
-    reset(template || { name: "", category: "Business", description: "", accentColor: "#2563EB", thumbnail: "" });
+    reset(template ? { ...templateFormDefaults, ...template, htmlContent: template.htmlContent || defaultHtmlTemplate } : templateFormDefaults);
   }, [template, reset, open]);
 
   const upload = async (event) => {
@@ -193,6 +257,26 @@ function TemplateForm({ open, template, uploadFile, onClose, onSave }) {
         <Field label="Accent color"><input className="premium-input" type="color" {...register("accentColor")} /></Field>
         <label className="secondary-btn mt-6 cursor-pointer"><FileUp className="h-4 w-4" /> Upload thumbnail<input className="hidden" type="file" accept="image/*" onChange={upload} /></label>
         <label className="block md:col-span-2"><span className="premium-label">Description</span><textarea className="premium-input mt-2 min-h-24" {...register("description")} /></label>
+        <section className="md:col-span-2">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <span className="premium-label">Design</span>
+              <h3 className="mt-1 text-base font-black">HTML template</h3>
+            </div>
+            <span className="rounded-md bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">Live preview</span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <textarea
+              className="premium-input min-h-[420px] resize-y font-mono text-xs leading-5"
+              spellCheck="false"
+              placeholder="<div>{{invoice.number}}</div>"
+              {...register("htmlContent")}
+            />
+            <div className="min-h-[420px] overflow-auto rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+              <div className="mx-auto min-h-[390px] max-w-[794px] bg-white text-slate-950 shadow-soft" dangerouslySetInnerHTML={{ __html: renderedPreview }} />
+            </div>
+          </div>
+        </section>
         <input type="hidden" {...register("thumbnail")} />
         <div className="flex justify-end gap-3 md:col-span-2"><button type="button" className="secondary-btn" onClick={onClose}>Cancel</button><button className="premium-btn" disabled={isSubmitting}>{isSubmitting ? "Saving..." : "Save template"}</button></div>
       </form>
@@ -206,4 +290,8 @@ function Field({ label, error, children }) {
 
 function previewLabel(field) {
   return field.replace(/^\{\{|\}\}$/g, "").split(".").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function renderSampleHtml(html) {
+  return Object.entries(sampleData).reduce((content, [key, value]) => content.replaceAll(key, value), html);
 }

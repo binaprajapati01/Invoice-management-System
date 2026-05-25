@@ -4,7 +4,7 @@ import { Document, Image, Page, PDFDownloadLink, StyleSheet, Text, View } from "
 import { useDropzone } from "react-dropzone";
 import SignatureCanvas from "react-signature-canvas";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { Download, ImagePlus, Mail, Plus, Save, Send, Trash2, UsersRound, X } from "lucide-react";
+import { Download, ImagePlus, Mail, Plus, Printer, Save, Send, Trash2, UsersRound, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { calculateInvoice, formatMoney } from "../lib/invoice.js";
 import { CustomSelect, PageHeader } from "../components/ui.jsx";
@@ -167,6 +167,33 @@ export default function InvoiceBuilderPage() {
     }
   };
 
+  const handlePrint = async () => {
+    const saved = await persistInvoice(invoice.status);
+    if (!saved?._id) return;
+    try {
+      const token = localStorage.getItem("invoiceflow_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(`/api/invoices/${saved._id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Print PDF failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 2000);
+      };
+    } catch (error) {
+      toast.error(error.message || "Print failed");
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -260,7 +287,7 @@ export default function InvoiceBuilderPage() {
             <PDFDownloadLink className="secondary-btn rounded-xl" document={<InvoicePdf invoice={invoiceWithTotals} qrDataUrl={qrDataUrl} />} fileName={`${invoice.invoiceNumber || "invoice"}.pdf`}>
               {({ loading: pdfLoading }) => <><Download className="h-4 w-4" /> {pdfLoading ? "Preparing" : "PDF"}</>}
             </PDFDownloadLink>
-            <button className="secondary-btn rounded-xl" onClick={() => window.print()}>Print</button>
+            <button className="secondary-btn rounded-xl" onClick={handlePrint}><Printer className="h-4 w-4" /> Print</button>
             <button className="premium-btn rounded-xl" onClick={() => setEmailOpen(true)}><Mail className="h-4 w-4" /> Email</button>
           </div>
         </aside>

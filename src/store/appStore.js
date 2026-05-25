@@ -150,9 +150,9 @@ export const useAppStore = create((set, get) => ({
     });
   },
 
-  async fetchLogs() {
+  async fetchLogs(params = {}) {
     return get().request("logs", async () => {
-      const { data } = await api.get("/logs");
+      const { data } = await api.get("/logs", { params });
       set({ logs: data });
       return data;
     });

@@ -1,7 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import User from "../models/User.js";
-import { requireAuth, permit } from "../middleware/auth.js";
+import { requireAuth, permit, requireRole } from "../middleware/auth.js";
 import { logActivity } from "../utils/logActivity.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { canManageUser, userScopeFor } from "../utils/scope.js";
@@ -26,7 +26,7 @@ router.get("/", permit("Super Admin", "Admin"), asyncHandler(async (req, res) =>
   res.json(users);
 }));
 
-router.post("/", permit("Super Admin", "Admin"), asyncHandler(async (req, res) => {
+router.post("/", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
     const data = z.object({
       name: z.string().min(2),
       email: z.string().email(),
@@ -60,7 +60,7 @@ router.patch("/:id", permit("Super Admin", "Admin"), asyncHandler(async (req, re
     res.json(user);
 }));
 
-router.delete("/:id", permit("Super Admin", "Admin"), asyncHandler(async (req, res) => {
+router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });
     if (!canManageUser(req.user.role, target.role)) return res.status(403).json({ message: "Cannot delete this user" });

@@ -16,11 +16,20 @@ import paymentRoutes from "./src/routes/payment.routes.js";
 import logRoutes from "./src/routes/log.routes.js";
 import uploadRoutes from "./src/routes/upload.routes.js";
 import searchRoutes from "./src/routes/search.routes.js";
+import { startScheduler } from "./src/utils/scheduler.js";
+
+const required = ["MONGODB_URI", "JWT_SECRET"];
+const missing = required.filter((key) => !process.env[key]);
+if (missing.length) {
+  console.error(`[Startup] Missing required env vars: ${missing.join(", ")}`);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 await connectDB();
+if (process.env.NODE_ENV !== "test") startScheduler();
 
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));

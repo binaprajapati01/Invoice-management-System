@@ -8,6 +8,10 @@ const templateSchema = new mongoose.Schema(
     thumbnail: String,
     fields: [{ label: String, key: String, required: Boolean }],
     layout: { type: Object, default: {} },
+    htmlContent: String,
+    uploadedImageUrl: String,
+    placeholderMap: [{ key: String, x: Number, y: Number, fontSize: Number, color: String }],
+    templateType: { type: String, enum: ["html", "image", "builtin"], default: "builtin" },
     accentColor: { type: String, default: "#2563EB" },
     isDefault: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }

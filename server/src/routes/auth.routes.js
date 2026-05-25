@@ -53,7 +53,10 @@ router.post("/refresh", asyncHandler(async (req, res) => {
   }
   const user = await User.findById(decoded.id);
   if (!user || user.refreshToken !== refreshToken || !user.isActive) return res.status(401).json({ message: "Invalid refresh session" });
-  res.json({ token: signToken(user), refreshToken, user: safeUser(user) });
+  const newRefreshToken = signRefreshToken(user);
+  user.refreshToken = newRefreshToken;
+  await user.save();
+  res.json({ token: signToken(user), refreshToken: newRefreshToken, user: safeUser(user) });
 }));
 
 router.post("/logout", requireAuth, asyncHandler(async (req, res) => {

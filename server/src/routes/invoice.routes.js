@@ -1,5 +1,6 @@
 import express from "express";
 import Invoice from "../models/Invoice.js";
+import Settings from "../models/Settings.js";
 import { requireAuth } from "../middleware/auth.js";
 import { calculateInvoice } from "../utils/invoiceMath.js";
 import { streamInvoicePdf } from "../utils/pdf.js";
@@ -37,7 +38,11 @@ router.get("/stats", asyncHandler(async (req, res) => {
 
 router.post("/", asyncHandler(async (req, res) => {
     const payload = sanitizeInvoicePayload(req.body);
-    const invoiceNumber = payload.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const settings = await Settings.findOne({});
+    const prefix = settings?.invoicePrefix || "INV";
+    const year = new Date().getFullYear();
+    const count = await Invoice.countDocuments({ invoiceNumber: new RegExp(`^${escapeRegex(prefix)}-${year}-`) });
+    const invoiceNumber = payload.invoiceNumber || `${prefix}-${year}-${String(count + 1).padStart(5, "0")}`;
     const totals = calculateInvoice(payload.items);
     const invoice = await Invoice.create({ ...payload, ...totals, invoiceNumber, createdBy: req.user._id });
     await logActivity(req, "Created invoice", "Invoice", invoice._id, { invoiceNumber });
@@ -67,8 +72,30 @@ router.delete("/:id", asyncHandler(async (req, res) => {
 }));
 
 router.get("/:id/pdf", asyncHandler(async (req, res) => {
-  const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } });
+  const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }).populate("template");
   if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
+  const tmpl = invoice.template;
+  if (tmpl?.templateType === "html" && tmpl?.htmlContent) {
+    const { renderTemplate } = await import("../utils/templateRenderer.js");
+    const html = renderTemplate(tmpl.htmlContent, invoice);
+    let browser;
+    try {
+      const puppeteer = await import("puppeteer");
+      browser = await puppeteer.default.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "networkidle0" });
+      const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename=${invoice.invoiceNumber}.pdf`);
+      return res.send(pdfBuffer);
+    } catch (error) {
+      console.warn("HTML template PDF generation failed, falling back to PDFKit:", error.message);
+    } finally {
+      if (browser) await browser.close().catch(() => {});
+    }
+  }
+
   streamInvoicePdf(invoice, res);
 }));
 
@@ -97,4 +124,8 @@ function sanitizeInvoicePayload(body = {}) {
     delete payload.client;
   }
   return payload;
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

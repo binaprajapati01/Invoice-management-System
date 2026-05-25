@@ -1,6 +1,6 @@
 import express from "express";
 import Template from "../models/Template.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { z } from "zod";
 
@@ -18,6 +18,10 @@ const templateSchema = z.object({
   thumbnail: z.string().optional(),
   fields: z.array(z.object({ label: z.string(), key: z.string(), required: z.boolean().optional() })).optional(),
   layout: z.record(z.any()).optional(),
+  htmlContent: z.string().optional(),
+  uploadedImageUrl: z.string().optional(),
+  placeholderMap: z.array(z.object({ key: z.string(), x: z.number(), y: z.number(), fontSize: z.number(), color: z.string() })).optional(),
+  templateType: z.enum(["html", "image", "builtin"]).default("builtin"),
   accentColor: z.string().default("#2563EB"),
   isDefault: z.boolean().optional()
 });
@@ -33,7 +37,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
   res.json(template);
 }));
 
-router.delete("/:id", asyncHandler(async (req, res) => {
+router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
   const template = await Template.findByIdAndDelete(req.params.id);
   if (!template) return res.status(404).json({ message: "Template not found" });
   res.status(204).end();

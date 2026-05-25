@@ -48,6 +48,31 @@ export default function InvoicesPage() {
     }
   };
 
+  const handlePrint = async (invoiceId) => {
+    try {
+      const token = localStorage.getItem("invoiceflow_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!res.ok) throw new Error("Print PDF failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          URL.revokeObjectURL(url);
+        }, 2000);
+      };
+    } catch (error) {
+      toast.error(error.message || "Print failed");
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -82,7 +107,7 @@ export default function InvoicesPage() {
                       <div className="flex gap-2">
                         <Link className="secondary-btn px-3 py-2" to={`/invoices/${invoice._id}/edit`}><Pencil className="h-4 w-4" /></Link>
                         <button className="secondary-btn px-3 py-2" onClick={() => downloadPdf(invoice)}><Download className="h-4 w-4" /></button>
-                        <button className="secondary-btn px-3 py-2" onClick={() => window.print()}><Printer className="h-4 w-4" /></button>
+                        <button className="secondary-btn px-3 py-2" onClick={() => handlePrint(invoice._id)}><Printer className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2" onClick={async () => { try { await emailInvoice(invoice._id, invoice.clientSnapshot?.email); toast.success("Invoice emailed"); } catch (error) { toast.error(error.message); } }}><Mail className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(invoice)}><Trash2 className="h-4 w-4" /></button>
                       </div>
