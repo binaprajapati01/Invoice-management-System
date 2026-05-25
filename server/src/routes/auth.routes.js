@@ -9,8 +9,16 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { createMailer } from "../config/mail.js";
 
 const router = express.Router();
-const signToken = (user) => jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || "dev-secret", { expiresIn: "15m" });
-const signRefreshToken = (user) => jwt.sign({ id: user._id, role: user.role, type: "refresh" }, process.env.JWT_SECRET || "dev-secret", { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" });
+const signToken = (user) => jwt.sign(
+  { id: user._id, role: user.role, email: user.email },
+  process.env.JWT_SECRET || "dev-secret",
+  { expiresIn: "7d" }
+);
+const signRefreshToken = (user) => jwt.sign(
+  { id: user._id, role: user.role, email: user.email, type: "refresh" },
+  process.env.JWT_SECRET || "dev-secret",
+  { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" }
+);
 
 async function registerUser(req, res) {
     const data = z.object({
@@ -34,7 +42,7 @@ router.post("/login", asyncHandler(async (req, res) => {
     }).parse(req.body);
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) return res.status(401).json({ message: "Invalid credentials" });
-    if (role && role !== user.role) return res.status(403).json({ message: `This account is not assigned to ${role}` });
+    if (role && normalizeRole(role) !== normalizeRole(user.role)) return res.status(403).json({ message: `This account is not assigned to ${role}` });
     user.lastLogin = new Date();
     user.refreshToken = signRefreshToken(user);
     await user.save();
@@ -113,6 +121,10 @@ function safeUser(user) {
   delete data.resetToken;
   delete data.refreshToken;
   return data;
+}
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 export default router;

@@ -6,6 +6,7 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import connectDB from "./src/config/db.js";
 import authRoutes from "./src/routes/auth.routes.js";
+import managerRoutes from "./src/routes/manager.routes.js";
 import userRoutes from "./src/routes/user.routes.js";
 import invoiceRoutes from "./src/routes/invoice.routes.js";
 import clientRoutes from "./src/routes/client.routes.js";
@@ -46,6 +47,7 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/managers", managerRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/clients", clientRoutes);

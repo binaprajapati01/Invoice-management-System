@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Check, ChevronDown } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Search } from "lucide-react";
 
 export function PageHeader({ eyebrow, title, description, action }) {
   return (
@@ -60,6 +60,21 @@ export function EmptyState({ icon: Icon, title, description, action }) {
       <h3 className="mt-5 text-lg font-bold">{title}</h3>
       <p className="mt-2 max-w-md text-sm text-slate-500">{description}</p>
       <div className="mt-5">{action}</div>
+    </div>
+  );
+}
+
+export function SearchBar({ value, onChange, placeholder = "Search...", className = "" }) {
+  return (
+    <div className={`relative flex w-full items-center md:max-w-sm ${className}`}>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+      <input
+        type="text"
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+      />
     </div>
   );
 }

@@ -120,7 +120,7 @@ export default function DashboardPage() {
             <div className="premium-card overflow-hidden">
               <h2 className="text-lg font-bold">{role === "Manager" ? "Recent invoices" : "User monitoring"}</h2>
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[560px] text-left text-sm">
+                <table className="premium-table min-w-[560px]">
                   <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th className="py-3">Name</th><th>Role/Client</th><th>Status</th><th>Activity</th></tr></thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {(role === "Manager" ? invoices : users).slice(0, 6).map((item) => (

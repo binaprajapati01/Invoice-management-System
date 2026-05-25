@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { LockKeyhole, Plus, Search, ShieldCheck, UserCog } from "lucide-react";
+import { LockKeyhole, Plus, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
-import { CustomSelect, PageHeader, StatusBadge } from "../components/ui.jsx";
+import { CustomSelect, PageHeader, SearchBar, StatusBadge } from "../components/ui.jsx";
 import CrudModal from "../components/CrudModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import Skeleton from "../components/Skeleton.jsx";
@@ -21,7 +21,7 @@ const schema = z.object({
 });
 
 export default function UsersPage({ type = "Manager" }) {
-  const { users, loading, fetchUsers, saveUser, deleteUser } = useAppStore();
+  const { users, loading, fetchUsers, saveUser, deleteUser, deleteManager } = useAppStore();
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [open, setOpen] = useState(false);
@@ -73,19 +73,11 @@ export default function UsersPage({ type = "Manager" }) {
       <div className="premium-card overflow-hidden p-0">
         <div className="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 md:flex-row md:items-center md:justify-between">
           <h2 className="text-lg font-bold">Accounts</h2>
-          <div className="relative flex w-full items-center md:max-w-sm">
-            <Search className="pointer-events-none absolute left-3 h-5 w-5 text-slate-400" />
-            <input
-              className="premium-input h-10 pl-11"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search accounts..."
-            />
-          </div>
+          <SearchBar value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search accounts..." />
         </div>
         {loading.users ? <div className="p-5"><Skeleton /></div> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="premium-table min-w-[760px]">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/60">
                 <tr><Sortable label="User" sortKey="name" sort={sort} setSort={setSort} /><Sortable label="Role" sortKey="role" sort={sort} setSort={setSort} /><th>Status</th><th>Permissions</th><Sortable label="Last login" sortKey="lastLogin" sort={sort} setSort={setSort} /><th></th></tr>
               </thead>
@@ -97,14 +89,14 @@ export default function UsersPage({ type = "Manager" }) {
                     <td><StatusBadge status={user.isActive ? "Active" : "Inactive"} /></td>
                     <td><span className="inline-flex items-center gap-2 text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Scoped access</span></td>
                     <td className="text-slate-500">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}</td>
-                    <td className="pr-5"><div className="flex justify-end gap-2"><button className="secondary-btn px-3 py-2" onClick={() => openForm(user)}><UserCog className="h-4 w-4" /> Edit</button><button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(user)}>Delete</button></div></td>
+                    <td className="pr-5"><div className="flex justify-end gap-2"><button className="secondary-btn px-3 py-2" onClick={() => openForm(user)}><UserCog className="h-4 w-4" /> Edit</button><button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(user)}><Trash2 className="h-4 w-4" /> Delete</button></div></td>
                   </tr>
                 ))}
                 {!filtered.length && <tr><td colSpan="6" className="px-5 py-10 text-center text-slate-500">No accounts found.</td></tr>}
               </tbody>
             </table>
             <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm text-slate-500 dark:border-slate-800">
-              <span>{filtered.length} accounts • Page {page} of {pageCount}</span>
+              <span>{filtered.length} accounts - Page {page} of {pageCount}</span>
               <div className="flex gap-2"><button className="secondary-btn px-3 py-2" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="secondary-btn px-3 py-2" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>Next</button></div>
             </div>
           </div>
@@ -123,10 +115,14 @@ export default function UsersPage({ type = "Manager" }) {
         }
       }} />
 
-      <ConfirmDialog open={Boolean(deleting)} title="Delete account" description={`Deactivate ${deleting?.name}? They will no longer be able to sign in.`} busy={loading.users} onCancel={() => setDeleting(null)} onConfirm={async () => {
+      <ConfirmDialog open={Boolean(deleting)} title={`Delete ${type === "Manager" ? "manager" : "account"}`} description={`Permanently delete ${deleting?.name}? This action will remove the account from the database.`} busy={loading.users} onCancel={() => setDeleting(null)} onConfirm={async () => {
         try {
-          await deleteUser(deleting._id);
-          toast.success("Account deactivated");
+          if (type === "Manager") {
+            await deleteManager(deleting._id);
+          } else {
+            await deleteUser(deleting._id);
+          }
+          toast.success(type === "Manager" ? "Manager deleted successfully" : "Account deleted successfully");
           setDeleting(null);
         } catch (error) {
           toast.error(error.message);
@@ -168,7 +164,7 @@ function Field({ label, error, children }) {
 
 function Sortable({ label, sortKey, sort, setSort }) {
   const active = sort.key === sortKey;
-  return <th className="px-5 py-4"><button className="font-bold uppercase tracking-wide" onClick={() => setSort((current) => ({ key: sortKey, direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc" }))}>{label} {active ? (sort.direction === "asc" ? "↑" : "↓") : ""}</button></th>;
+  return <th className="px-5 py-4"><button className="font-bold uppercase tracking-wide" onClick={() => setSort((current) => ({ key: sortKey, direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc" }))}>{label} {active ? (sort.direction === "asc" ? "ASC" : "DESC") : ""}</button></th>;
 }
 
 function compare(a, b, sort) {

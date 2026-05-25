@@ -76,7 +76,7 @@ export default function PaymentsPage() {
           <div className="border-b border-slate-200 p-5 dark:border-slate-800"><h2 className="text-lg font-bold">Recent transactions</h2></div>
           {loading.payments ? <div className="p-5"><Skeleton /></div> : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="premium-table min-w-[720px]">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800"><tr><th className="px-5 py-4">Invoice</th><th>Client</th><th>Method</th><th>Status</th><th>Amount</th></tr></thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((payment) => (

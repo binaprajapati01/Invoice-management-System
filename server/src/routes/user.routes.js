@@ -84,9 +84,9 @@ router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (r
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });
     if (!canManageUser(req.user.role, target.role)) return res.status(403).json({ message: "Cannot delete this user" });
-    await User.findByIdAndUpdate(req.params.id, { isActive: false });
-    await logActivity(req, "Deactivated account", "User", req.params.id);
-    res.status(204).end();
+    await User.findByIdAndDelete(req.params.id);
+    await logActivity(req, "Deleted account", "User", req.params.id);
+    res.status(200).json({ message: "User deleted successfully" });
 }));
 
 function safeUser(user) {

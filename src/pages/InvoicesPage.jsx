@@ -108,7 +108,7 @@ export default function InvoicesPage() {
         </div>
         {loading.invoices ? <div className="pt-5"><Skeleton /></div> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+            <table className="premium-table min-w-[920px]">
               <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr><Sortable label="Invoice" sortKey="invoiceNumber" sort={sort} setSort={setSort} /><th>Client</th><Sortable label="Due date" sortKey="dueDate" sort={sort} setSort={setSort} /><Sortable label="Status" sortKey="status" sort={sort} setSort={setSort} /><Sortable label="Total" sortKey="total" sort={sort} setSort={setSort} /><th>Actions</th></tr>
               </thead>

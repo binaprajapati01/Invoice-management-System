@@ -34,12 +34,12 @@ const roleNav = {
 
 export default function Sidebar({ mobileOpen = false, collapsed = false, onToggleCollapse, onClose }) {
   const { user } = useAuth();
-  const links = roleNav[user?.role] || roleNav.Manager;
+  const links = roleNav[roleNavKey(user?.role)] || roleNav.Manager;
 
   return (
     <>
       {mobileOpen && <button className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-sm lg:hidden" onClick={onClose} aria-label="Close navigation overlay" />}
-      <aside className={`fixed inset-y-0 left-0 z-40 border-r border-slate-200/70 bg-white/92 px-4 py-5 shadow-soft backdrop-blur-2xl transition-all dark:border-slate-800 dark:bg-slate-950/92 lg:translate-x-0 ${collapsed ? "lg:w-24" : "lg:w-72"} ${mobileOpen ? "w-72 translate-x-0" : "w-72 -translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 border-r border-slate-200/70 bg-white/95 px-4 py-5 shadow-soft backdrop-blur-2xl transition-all dark:border-slate-800 dark:bg-slate-950/95 lg:translate-x-0 ${collapsed ? "lg:w-24" : "lg:w-[260px]"} ${mobileOpen ? "w-[260px] translate-x-0" : "w-[260px] -translate-x-full"}`}>
       <div className="flex items-center gap-3 px-2">
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-lg font-black text-white shadow-glow">IF</div>
         <div className={collapsed ? "lg:hidden" : ""}>
@@ -81,4 +81,11 @@ export default function Sidebar({ mobileOpen = false, collapsed = false, onToggl
       </aside>
     </>
   );
+}
+
+function roleNavKey(role = "") {
+  const normalized = String(role).trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalized === "super admin" || normalized === "superadmin") return "Super Admin";
+  if (normalized === "admin") return "Admin";
+  return "Manager";
 }

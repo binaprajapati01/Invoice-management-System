@@ -34,6 +34,14 @@ export function requireRole(...roles) {
   };
 }
 
+export function requireAdmin(req, res, next) {
+  const role = normalizeRole(req.user?.role);
+  if (!["admin", "super admin", "superadmin"].includes(role)) {
+    return res.status(403).json({ message: "Access denied: insufficient role" });
+  }
+  next();
+}
+
 export function requireOwnerOrRoles(ownerField, ...roles) {
   return (req, res, next) => {
     if (hasRole(req.user?.role, roles)) return next();
@@ -44,9 +52,17 @@ export function requireOwnerOrRoles(ownerField, ...roles) {
 
 function hasRole(actualRole, allowedRoles) {
   const normalized = normalizeRole(actualRole);
-  return allowedRoles.some((role) => normalizeRole(role) === normalized);
+  const compact = compactRole(normalized);
+  return allowedRoles.some((role) => {
+    const allowed = normalizeRole(role);
+    return allowed === normalized || compactRole(allowed) === compact;
+  });
 }
 
 function normalizeRole(role = "") {
-  return String(role).trim().toLowerCase();
+  return String(role).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function compactRole(role = "") {
+  return String(role).replace(/\s+/g, "");
 }

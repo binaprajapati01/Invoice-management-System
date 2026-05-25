@@ -49,6 +49,12 @@ export const useAppStore = create((set, get) => ({
       set((state) => ({ users: state.users.filter((user) => user._id !== id) }));
     });
   },
+  async deleteManager(id) {
+    return get().request("users", async () => {
+      await api.delete(`/managers/${id}`);
+      set((state) => ({ users: state.users.filter((user) => user._id !== id) }));
+    });
+  },
 
   async fetchClients() {
     return get().request("clients", async () => {
