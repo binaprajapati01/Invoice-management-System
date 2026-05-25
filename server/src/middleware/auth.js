@@ -19,7 +19,7 @@ export async function requireAuth(req, res, next) {
 
 export function permit(...roles) {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) return res.status(403).json({ message: "Insufficient permissions" });
+    if (!hasRole(req.user?.role, roles)) return res.status(403).json({ message: "Insufficient permissions" });
     next();
   };
 }
@@ -27,7 +27,7 @@ export function permit(...roles) {
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
-    if (!roles.includes(req.user.role)) {
+    if (!hasRole(req.user.role, roles)) {
       return res.status(403).json({ message: "Access denied: insufficient role" });
     }
     next();
@@ -36,8 +36,17 @@ export function requireRole(...roles) {
 
 export function requireOwnerOrRoles(ownerField, ...roles) {
   return (req, res, next) => {
-    if (roles.includes(req.user.role)) return next();
+    if (hasRole(req.user?.role, roles)) return next();
     if (String(req.resource?.[ownerField]) === String(req.user._id)) return next();
     return res.status(403).json({ message: "You cannot access this resource" });
   };
+}
+
+function hasRole(actualRole, allowedRoles) {
+  const normalized = normalizeRole(actualRole);
+  return allowedRoles.some((role) => normalizeRole(role) === normalized);
+}
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase();
 }

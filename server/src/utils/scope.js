@@ -1,16 +1,23 @@
 export function canManageUser(actorRole, targetRole) {
-  if (actorRole === "Super Admin") return ["Admin", "Manager"].includes(targetRole);
-  if (actorRole === "Admin") return targetRole === "Manager";
+  const actor = normalizeRole(actorRole);
+  const target = normalizeRole(targetRole);
+  if (actor === "super admin") return ["admin", "manager"].includes(target);
+  if (actor === "admin") return target === "manager";
   return false;
 }
 
 export function userScopeFor(actor) {
-  if (actor.role === "Super Admin") return { role: { $in: ["Admin", "Manager"] } };
-  if (actor.role === "Admin") return { role: "Manager" };
+  const role = normalizeRole(actor.role);
+  if (role === "super admin") return { role: { $in: ["Admin", "Manager", "admin", "manager"] } };
+  if (role === "admin") return { role: { $in: ["Manager", "manager"] } };
   return { _id: actor._id };
 }
 
 export function invoiceScopeFor(actor) {
-  if (actor.role === "Manager") return { createdBy: actor._id };
+  if (normalizeRole(actor.role) === "manager") return { createdBy: actor._id };
   return {};
+}
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase();
 }

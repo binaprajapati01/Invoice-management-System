@@ -80,7 +80,7 @@ router.patch("/:id", permit("Super Admin", "Admin"), asyncHandler(async (req, re
     res.json(user);
 }));
 
-router.delete("/:id", requireRole("Super Admin"), asyncHandler(async (req, res) => {
+router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });
     if (!canManageUser(req.user.role, target.role)) return res.status(403).json({ message: "Cannot delete this user" });

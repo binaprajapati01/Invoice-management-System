@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { LockKeyhole, Plus, ShieldCheck, UserCog } from "lucide-react";
+import { LockKeyhole, Plus, Search, ShieldCheck, UserCog } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
 import { CustomSelect, PageHeader, StatusBadge } from "../components/ui.jsx";
@@ -26,8 +26,12 @@ export default function UsersPage({ type = "Manager" }) {
   const [deleting, setDeleting] = useState(null);
   const [open, setOpen] = useState(false);
   const [sort, setSort] = useState({ key: "name", direction: "asc" });
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const filtered = useMemo(() => (type === "Permissions" ? users : users.filter((user) => user.role === type)).sort((a, b) => compare(a, b, sort)), [type, users, sort]);
+  const filtered = useMemo(() => users
+    .filter((user) => type === "Permissions" || normalizeRole(user.role) === normalizeRole(type))
+    .filter((user) => [user.name, user.email, user.department, user.phone].join(" ").toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => compare(a, b, sort)), [type, users, query, sort]);
   const pageSize = 8;
   const pageCount = Math.max(Math.ceil(filtered.length / pageSize), 1);
   const rows = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -40,6 +44,10 @@ export default function UsersPage({ type = "Manager" }) {
     setEditing(user);
     setOpen(true);
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, type]);
 
   return (
     <>
@@ -63,7 +71,18 @@ export default function UsersPage({ type = "Manager" }) {
       )}
 
       <div className="premium-card overflow-hidden p-0">
-        <div className="border-b border-slate-200 p-5 dark:border-slate-800"><h2 className="text-lg font-bold">Accounts</h2></div>
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-bold">Accounts</h2>
+          <div className="relative flex w-full items-center md:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 h-5 w-5 text-slate-400" />
+            <input
+              className="premium-input h-10 pl-11"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search accounts..."
+            />
+          </div>
+        </div>
         {loading.users ? <div className="p-5"><Skeleton /></div> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
@@ -157,4 +176,8 @@ function compare(a, b, sort) {
   const bv = sort.key === "lastLogin" ? new Date(b.lastLogin || 0).getTime() : b[sort.key];
   const result = typeof av === "number" || typeof bv === "number" ? Number(av || 0) - Number(bv || 0) : String(av || "").localeCompare(String(bv || ""));
   return sort.direction === "asc" ? result : -result;
+}
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase();
 }
