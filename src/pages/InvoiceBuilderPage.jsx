@@ -66,6 +66,7 @@ export default function InvoiceBuilderPage() {
       setInvoice({
         ...buildInitialInvoice(),
         ...data,
+        client: data.client?._id || data.client || "",
         issueDate: toDateInput(data.issueDate),
         dueDate: toDateInput(data.dueDate),
         company: { name: "", email: "", address: "", logo: "", signature: "", ...data.company },
@@ -95,8 +96,8 @@ export default function InvoiceBuilderPage() {
     });
   };
 
-  const selectClient = (clientId) => {
-    const client = clients.find((item) => item._id === clientId);
+  const selectClient = (clientOrId) => {
+    const client = typeof clientOrId === "object" ? clientOrId : clients.find((item) => item._id === clientOrId);
     if (!client) return;
     setInvoice((current) => ({
       ...current,
@@ -115,7 +116,7 @@ export default function InvoiceBuilderPage() {
   const addClientInline = async () => {
     try {
       const saved = await saveClient(newClient);
-      selectClient(saved._id);
+      selectClient(saved);
       setNewClient({ name: "", email: "", phone: "", address: "", GSTIN: "", panNumber: "", status: "Active", currency: invoice.currency });
       toast.success("Client added");
     } catch (error) {
@@ -143,7 +144,8 @@ export default function InvoiceBuilderPage() {
       return null;
     }
     try {
-      const saved = await saveInvoice({ ...invoiceWithTotals, status, qrPaymentUrl: qrValue }, id);
+      const selectedClientId = clients.some((client) => client._id === invoice.client) ? invoice.client : "";
+      const saved = await saveInvoice({ ...invoiceWithTotals, client: selectedClientId, status, qrPaymentUrl: qrValue }, id);
       toast.success(status === "Draft" ? "Draft saved" : "Invoice saved");
       if (!id) navigate(`/invoices/${saved._id}/edit`, { replace: true });
       return saved;

@@ -68,7 +68,7 @@ export function CustomSelect({ label, value, onChange, options = [], placeholder
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const normalized = options.map((option) => typeof option === "string" ? { label: option, value: option } : option);
-  const selected = normalized.find((option) => option.value === value) || normalized[0];
+  const selected = normalized.find((option) => option.value === value);
   const SelectedIcon = selected?.icon;
 
   useEffect(() => {

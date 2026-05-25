@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Eye, FileUp, LayoutTemplate, Pencil, Trash2 } from "lucide-react";
+import { Eye, FileUp, LayoutTemplate, Pencil, Plus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
 import { PageHeader } from "../components/ui.jsx";
@@ -24,10 +24,30 @@ export default function TemplatesPage() {
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [mappingFields, setMappingFields] = useState(["{{invoice.number}}", "{{client.name}}", "{{items.table}}", "{{tax.total}}", "{{payment.qr}}"]);
+  const [customField, setCustomField] = useState("");
 
   useEffect(() => {
     fetchTemplates().catch((error) => toast.error(error.message));
   }, []);
+
+  const copyField = async (field) => {
+    try {
+      await navigator.clipboard.writeText(field);
+      toast.success("Copied!");
+    } catch {
+      toast.error("Copy failed");
+    }
+  };
+
+  const addCustomField = (event) => {
+    event.preventDefault();
+    const cleaned = customField.trim().replace(/^\{\{|\}\}$/g, "").replace(/\s+/g, ".");
+    if (!cleaned) return;
+    const nextField = `{{${cleaned}}}`;
+    if (!mappingFields.includes(nextField)) setMappingFields((fields) => [...fields, nextField]);
+    setCustomField("");
+  };
 
   return (
     <>
@@ -69,8 +89,48 @@ export default function TemplatesPage() {
           <h2 className="mt-4 text-xl font-black">Dynamic field mapping</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">Template field definitions are stored with each template and can be used by the invoice renderer and PDF generator.</p>
           <div className="mt-6 space-y-3">
-            {["{{invoice.number}}", "{{client.name}}", "{{items.table}}", "{{tax.total}}", "{{payment.qr}}"].map((field) => <div key={field} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-950">{field}</div>)}
+            {mappingFields.map((field) => (
+              <button
+                key={field}
+                type="button"
+                className="w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-left font-mono text-sm transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-500 dark:hover:bg-blue-500/10"
+                onClick={() => copyField(field)}
+              >
+                {field}
+              </button>
+            ))}
           </div>
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="premium-label">Preview</p>
+                <h3 className="mt-2 text-base font-black">Mock invoice</h3>
+              </div>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">Draft</span>
+            </div>
+            <div className="mt-4 grid gap-2 text-sm">
+              {mappingFields.map((field) => (
+                <div key={`preview-${field}`} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 dark:bg-slate-900">
+                  <span className="text-slate-500">{previewLabel(field)}</span>
+                  <span className="truncate font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">{field}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <form className="mt-6" onSubmit={addCustomField}>
+            <span className="premium-label">Add custom field</span>
+            <div className="mt-2 flex gap-2">
+              <input
+                className="premium-input min-w-0 flex-1"
+                value={customField}
+                onChange={(event) => setCustomField(event.target.value)}
+                placeholder="field.name"
+              />
+              <button className="secondary-btn px-3" type="submit" aria-label="Add custom field">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
         </aside>
       </div>
 
@@ -142,4 +202,8 @@ function TemplateForm({ open, template, uploadFile, onClose, onSave }) {
 
 function Field({ label, error, children }) {
   return <label className="block"><span className="premium-label">{label}</span><div className="mt-2">{children}</div>{error && <span className="mt-1 block text-xs font-semibold text-rose-500">{error}</span>}</label>;
+}
+
+function previewLabel(field) {
+  return field.replace(/^\{\{|\}\}$/g, "").split(".").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }

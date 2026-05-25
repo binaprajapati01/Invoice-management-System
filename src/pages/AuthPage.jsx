@@ -90,7 +90,11 @@ export default function AuthPage({ mode = "login" }) {
             </Field>
           )}
 
-          {["login", "signup"].includes(mode) && (
+          {mode === "login" && (
+            <RoleTiles value={role} onChange={(value) => setValue("role", value, { shouldValidate: true })} error={errors.role?.message} />
+          )}
+
+          {mode === "signup" && (
             <CustomSelect label="Role" value={role} onChange={(value) => setValue("role", value, { shouldValidate: true })} options={roles} error={errors.role?.message} />
           )}
 
@@ -228,6 +232,33 @@ function Brand() {
 
 function Field({ label, error, children }) {
   return <label className="block"><span className="premium-label">{label}</span><div className="mt-2">{children}</div>{error && <span className="mt-1 block text-xs font-semibold text-rose-500">{error}</span>}</label>;
+}
+
+function RoleTiles({ value, onChange, error }) {
+  return (
+    <div className="block">
+      <span className="premium-label">Role</span>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {roles.map((roleOption) => {
+          const Icon = roleOption.icon;
+          const active = value === roleOption.value;
+          return (
+            <button
+              key={roleOption.value}
+              type="button"
+              className={`flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-xl border bg-white px-2 py-3 text-center text-xs font-bold text-slate-700 transition dark:bg-slate-900 dark:text-slate-200 ${active ? "border-blue-500 shadow-glow ring-4 ring-blue-500/10" : "border-slate-200 hover:border-blue-200 hover:text-blue-700 dark:border-slate-700"}`}
+              onClick={() => onChange(roleOption.value)}
+              aria-pressed={active}
+            >
+              <Icon className="h-5 w-5 text-blue-600" />
+              <span className="leading-tight">{roleOption.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {error && <span className="mt-1 block text-xs font-semibold text-rose-500">{error}</span>}
+    </div>
+  );
 }
 
 function IconInput({ icon: Icon, register, autoComplete }) {

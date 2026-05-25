@@ -36,9 +36,10 @@ router.get("/stats", asyncHandler(async (req, res) => {
 }));
 
 router.post("/", asyncHandler(async (req, res) => {
-    const invoiceNumber = req.body.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    const totals = calculateInvoice(req.body.items);
-    const invoice = await Invoice.create({ ...req.body, ...totals, invoiceNumber, createdBy: req.user._id });
+    const payload = sanitizeInvoicePayload(req.body);
+    const invoiceNumber = payload.invoiceNumber || `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const totals = calculateInvoice(payload.items);
+    const invoice = await Invoice.create({ ...payload, ...totals, invoiceNumber, createdBy: req.user._id });
     await logActivity(req, "Created invoice", "Invoice", invoice._id, { invoiceNumber });
     res.status(201).json(invoice);
 }));
@@ -50,8 +51,9 @@ router.get("/:id", asyncHandler(async (req, res) => {
 }));
 
 router.patch("/:id", asyncHandler(async (req, res) => {
-    const totals = req.body.items ? calculateInvoice(req.body.items) : {};
-    const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }, { ...req.body, ...totals }, { new: true });
+    const payload = sanitizeInvoicePayload(req.body);
+    const totals = payload.items ? calculateInvoice(payload.items) : {};
+    const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }, { ...payload, ...totals }, { new: true });
     if (!invoice) return res.status(404).json({ message: "Invoice not found" });
     await logActivity(req, "Updated invoice", "Invoice", req.params.id);
     res.json(invoice);
@@ -88,3 +90,11 @@ router.post("/:id/email", asyncHandler(async (req, res) => {
 }));
 
 export default router;
+
+function sanitizeInvoicePayload(body = {}) {
+  const payload = { ...body };
+  if (!payload.client || (typeof payload.client === "string" && !payload.client.trim())) {
+    delete payload.client;
+  }
+  return payload;
+}
