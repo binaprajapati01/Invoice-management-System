@@ -9,17 +9,37 @@ import { canManageUser, userScopeFor } from "../utils/scope.js";
 const router = express.Router();
 router.use(requireAuth);
 
-router.patch("/me/profile", asyncHandler(async (req, res) => {
+router.patch("/me", asyncHandler(updateMe));
+router.patch("/me/profile", asyncHandler(updateMe));
+
+async function updateMe(req, res) {
   const updates = z.object({
     name: z.string().min(2).optional(),
     phone: z.string().optional(),
     department: z.string().optional(),
-    avatar: z.string().optional()
+    avatar: z.string().optional(),
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(8).optional()
   }).parse(req.body);
-  const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select("-password");
+
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  if (updates.newPassword) {
+    if (!updates.currentPassword || !(await user.comparePassword(updates.currentPassword))) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+    user.password = updates.newPassword;
+  }
+
+  ["name", "phone", "department", "avatar"].forEach((field) => {
+    if (updates[field] !== undefined) user[field] = updates[field];
+  });
+
+  await user.save();
   await logActivity(req, "Updated profile", "User", req.user._id);
-  res.json(user);
-}));
+  res.json(safeUser(user));
+}
 
 router.get("/", permit("Super Admin", "Admin"), asyncHandler(async (req, res) => {
   const users = await User.find(userScopeFor(req.user)).select("-password").sort({ createdAt: -1 });
@@ -60,7 +80,7 @@ router.patch("/:id", permit("Super Admin", "Admin"), asyncHandler(async (req, re
     res.json(user);
 }));
 
-router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
+router.delete("/:id", requireRole("Super Admin"), asyncHandler(async (req, res) => {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });
     if (!canManageUser(req.user.role, target.role)) return res.status(403).json({ message: "Cannot delete this user" });
@@ -68,5 +88,14 @@ router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (r
     await logActivity(req, "Deactivated account", "User", req.params.id);
     res.status(204).end();
 }));
+
+function safeUser(user) {
+  const data = user.toObject ? user.toObject() : { ...user };
+  delete data.password;
+  delete data.otp;
+  delete data.resetToken;
+  delete data.refreshToken;
+  return data;
+}
 
 export default router;

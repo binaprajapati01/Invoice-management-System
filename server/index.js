@@ -29,7 +29,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 await connectDB();
-if (process.env.NODE_ENV !== "test") startScheduler();
+if (process.env.NODE_ENV !== "test") {
+  startScheduler();
+  console.log("Schedulers started");
+}
 
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
@@ -52,6 +55,7 @@ app.use("/api/analytics", reportRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/logs", logRoutes);
+app.use("/api/upload", uploadRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/search", searchRoutes);
 

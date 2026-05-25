@@ -96,10 +96,10 @@ export function AuthProvider({ children }) {
     toast.success("Signed out");
   };
 
-  const updateProfile = async (payload) => {
-    const { data } = await api.patch("/users/me/profile", payload);
+  const updateProfile = async (payload, successMessage = "Profile updated") => {
+    const { data } = await api.patch("/users/me", payload);
     persist(data, token);
-    toast.success("Profile updated");
+    toast.success(successMessage);
     return data;
   };
 

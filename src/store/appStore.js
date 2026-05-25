@@ -101,7 +101,8 @@ export const useAppStore = create((set, get) => ({
   },
   async emailInvoice(id, to) {
     return get().request("emailInvoice", async () => {
-      const { data } = await api.post(`/invoices/${id}/email`, { to });
+      const { data } = await api.post(`/invoices/${id}/send-email`, { to });
+      await get().fetchInvoices();
       return data;
     });
   },

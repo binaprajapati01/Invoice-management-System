@@ -5,7 +5,21 @@ export function streamInvoicePdf(invoice, res) {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename=${invoice.invoiceNumber}.pdf`);
   doc.pipe(res);
+  drawInvoice(doc, invoice);
+}
 
+export function buildInvoicePdfBuffer(invoice) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    drawInvoice(doc, invoice);
+  });
+}
+
+function drawInvoice(doc, invoice) {
   doc.rect(0, 0, 595, 140).fill("#F8FAFC");
   doc.fillColor("#111827").fontSize(24).font("Helvetica-Bold").text(invoice.company?.name || "InvoiceFlow", 48, 48);
   doc.fillColor("#2563EB").fontSize(34).text("INVOICE", 410, 44, { align: "right" });

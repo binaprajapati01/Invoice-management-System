@@ -1,14 +1,14 @@
 import express from "express";
 import ActivityLog from "../models/ActivityLog.js";
 import User from "../models/User.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { userScopeFor } from "../utils/scope.js";
 
 const router = express.Router();
 router.use(requireAuth);
 
-router.get("/", asyncHandler(async (req, res) => {
+router.get("/", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.userId) filter.actor = req.query.userId;
   if (req.query.action) filter.action = new RegExp(req.query.action, "i");

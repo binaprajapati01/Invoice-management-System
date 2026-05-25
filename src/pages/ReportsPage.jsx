@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Activity, BarChart3, PieChart, TrendingUp } from "lucide-react";
+import { Activity, BarChart3, Download, PieChart, TrendingUp } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
 import { EmptyState, KpiCard, PageHeader } from "../components/ui.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import api from "../lib/api.js";
 
 export default function ReportsPage() {
   const { reports, loading, fetchReports } = useAppStore();
@@ -16,12 +17,34 @@ export default function ReportsPage() {
   const growth = (reports?.revenueSeries || []).map((item, index, rows) => ({ ...item, growth: index && rows[index - 1].revenue ? Math.round(((item.revenue - rows[index - 1].revenue) / rows[index - 1].revenue) * 100) : 0 }));
   const paidRatio = reports?.kpis?.invoices ? Math.round((reports.kpis.paid / reports.kpis.invoices) * 100) : 0;
 
+  const downloadExport = async (type) => {
+    try {
+      const extension = type === "csv" ? "csv" : "xlsx";
+      const { data } = await api.get(`/reports/export/${type}`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoices-report.${extension}`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Export ${extension.toUpperCase()} started`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Export failed");
+    }
+  };
+
   return (
     <>
       <PageHeader
         eyebrow="Reports and analytics"
         title="Business Intelligence"
         description="Revenue charts, paid versus unpaid invoices, growth, client trends, and performance analytics calculated from database records."
+        action={(
+          <div className="flex flex-wrap gap-2">
+            <button className="secondary-btn" onClick={() => downloadExport("csv")}><Download className="h-4 w-4" /> Export CSV</button>
+            <button className="premium-btn" onClick={() => downloadExport("excel")}><Download className="h-4 w-4" /> Export Excel</button>
+          </div>
+        )}
       />
       {loading.reports ? <Skeleton rows={5} /> : (
         <>

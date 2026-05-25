@@ -3,12 +3,13 @@ import Invoice from "../models/Invoice.js";
 import User from "../models/User.js";
 import Client from "../models/Client.js";
 import Payment from "../models/Payment.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { invoiceScopeFor } from "../utils/scope.js";
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireRole("Super Admin", "Admin"));
 
 router.get("/overview", asyncHandler(async (req, res) => {
   const scope = { ...invoiceScopeFor(req.user), isDeleted: { $ne: true } };
@@ -81,6 +82,46 @@ router.get("/payments", asyncHandler(async (req, res) => {
   res.json(["Cash", "UPI", "Bank Transfer", "Card", "Other"].map((method) => ({ name: method, value: payments.filter((payment) => payment.method === method).length })));
 }));
 
+router.get("/export/csv", asyncHandler(async (req, res) => {
+  const rows = await getReportRows(req);
+  const csv = [
+    ["invoiceNumber", "clientName", "status", "total", "paidAmount", "dueDate", "issueDate"],
+    ...rows.map((invoice) => [
+      invoice.invoiceNumber,
+      invoice.clientSnapshot?.name || invoice.client?.name || "",
+      invoice.status,
+      invoice.total,
+      invoice.paidAmount,
+      formatDate(invoice.dueDate),
+      formatDate(invoice.issueDate)
+    ])
+  ].map((row) => row.map(csvEscape).join(",")).join("\n");
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", "attachment; filename=invoices-report.csv");
+  res.send(csv);
+}));
+
+router.get("/export/excel", asyncHandler(async (req, res) => {
+  const rows = await getReportRows(req);
+  const tsv = [
+    ["Invoice Number", "Client Name", "Status", "Total", "Paid Amount", "Due Date", "Issue Date"],
+    ...rows.map((invoice) => [
+      invoice.invoiceNumber,
+      invoice.clientSnapshot?.name || invoice.client?.name || "",
+      invoice.status,
+      invoice.total,
+      invoice.paidAmount,
+      formatDate(invoice.dueDate),
+      formatDate(invoice.issueDate)
+    ])
+  ].map((row) => row.map(tsvEscape).join("\t")).join("\n");
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=invoices-report.xlsx");
+  res.send(tsv);
+}));
+
 function clientScopeFor(user) {
   return user.role === "Manager" ? { createdBy: user._id } : {};
 }
@@ -114,6 +155,45 @@ function topClients(invoices) {
     totals.set(name, (totals.get(name) || 0) + Number(invoice.total || 0));
   });
   return [...totals.entries()].map(([client, revenue]) => ({ client, revenue })).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+}
+
+function buildReportQuery(req) {
+  const query = { ...invoiceScopeFor(req.user), isDeleted: { $ne: true } };
+  if (req.query.status && req.query.status !== "All") query.status = req.query.status;
+
+  const startDate = req.query.startDate || req.query.from;
+  const endDate = req.query.endDate || req.query.to;
+  if (startDate || endDate) {
+    query.issueDate = {};
+    if (startDate) query.issueDate.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      query.issueDate.$lte = end;
+    }
+  }
+
+  return query;
+}
+
+function getReportRows(req) {
+  return Invoice.find(buildReportQuery(req))
+    .populate("client", "name email")
+    .sort({ issueDate: -1 })
+    .lean();
+}
+
+function formatDate(date) {
+  return date ? new Date(date).toISOString().slice(0, 10) : "";
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function tsvEscape(value) {
+  return String(value ?? "").replaceAll("\t", " ").replaceAll("\n", " ").replaceAll("\r", " ");
 }
 
 export default router;

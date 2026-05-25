@@ -1,13 +1,13 @@
 import express from "express";
 import Invoice from "../models/Invoice.js";
 import Settings from "../models/Settings.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { calculateInvoice } from "../utils/invoiceMath.js";
-import { streamInvoicePdf } from "../utils/pdf.js";
+import { buildInvoicePdfBuffer, streamInvoicePdf } from "../utils/pdf.js";
 import { logActivity } from "../utils/logActivity.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { invoiceScopeFor } from "../utils/scope.js";
-import { createMailer } from "../config/mail.js";
+import { createMailer, getFromAddress } from "../config/mail.js";
 
 const router = express.Router();
 router.use(requireAuth);
@@ -64,7 +64,7 @@ router.patch("/:id", asyncHandler(async (req, res) => {
     res.json(invoice);
 }));
 
-router.delete("/:id", asyncHandler(async (req, res) => {
+router.delete("/:id", requireRole("Super Admin", "Admin", "Manager"), asyncHandler(async (req, res) => {
     const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }, { isDeleted: true, deletedAt: new Date() });
     if (!invoice) return res.status(404).json({ message: "Invoice not found" });
     await logActivity(req, "Deleted invoice", "Invoice", req.params.id);
@@ -99,22 +99,45 @@ router.get("/:id/pdf", asyncHandler(async (req, res) => {
   streamInvoicePdf(invoice, res);
 }));
 
-router.post("/:id/email", asyncHandler(async (req, res) => {
-  const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } });
+router.post("/:id/send-email", asyncHandler(sendInvoiceEmail));
+router.post("/:id/email", asyncHandler(sendInvoiceEmail));
+
+async function sendInvoiceEmail(req, res) {
+  const invoice = await Invoice.findOne({ _id: req.params.id, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }).populate("client", "name email");
   if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-  const mailer = createMailer();
+
+  const settings = await Settings.findOne({});
+  const mailer = createMailer(settings);
   if (!mailer) return res.status(503).json({ message: "SMTP is not configured" });
-  const to = req.body.to || invoice.clientSnapshot?.email;
-  if (!to) return res.status(400).json({ message: "Recipient email is required" });
+
+  const to = invoice.client?.email || invoice.clientSnapshot?.email;
+  if (!to) return res.status(400).json({ message: "Client email is required" });
+
+  const placeholders = buildEmailPlaceholders(invoice);
+  const subject = replaceTemplate(settings?.emailSettings?.subjectTemplate || "Invoice {{invoiceNumber}}", placeholders);
+  const html = replaceTemplate(settings?.emailSettings?.bodyTemplate || defaultInvoiceEmailTemplate(), placeholders);
+  const pdfBuffer = await buildInvoicePdfBuffer(invoice);
+
   await mailer.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    from: getFromAddress(settings),
     to,
-    subject: `Invoice ${invoice.invoiceNumber}`,
-    html: `<p>Hello ${invoice.clientSnapshot?.name || "there"},</p><p>Please find invoice <strong>${invoice.invoiceNumber}</strong> for ${invoice.currency} ${Number(invoice.total || 0).toFixed(2)}.</p><p>Due date: ${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "On receipt"}.</p>`
+    subject,
+    html,
+    attachments: [{
+      filename: `${invoice.invoiceNumber}.pdf`,
+      content: pdfBuffer,
+      contentType: "application/pdf"
+    }]
   });
-  await logActivity(req, "Emailed invoice", "Invoice", req.params.id, { to });
-  res.json({ message: "Invoice email sent" });
-}));
+
+  if (invoice.status === "Draft") {
+    invoice.status = "Sent";
+    await invoice.save();
+  }
+
+  await logActivity(req, "Sent invoice via email", "Invoice", req.params.id, { to, invoiceNumber: invoice.invoiceNumber });
+  res.json({ success: true, message: "Email sent" });
+}
 
 export default router;
 
@@ -128,4 +151,26 @@ function sanitizeInvoicePayload(body = {}) {
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildEmailPlaceholders(invoice) {
+  const dueDate = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("en-IN") : "On receipt";
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    clientName: invoice.client?.name || invoice.clientSnapshot?.name || "Client",
+    total: `${invoice.currency || "INR"} ${Number(invoice.total || 0).toFixed(2)}`,
+    dueDate
+  };
+}
+
+function replaceTemplate(template, values) {
+  return String(template || "").replace(/{{\s*(invoiceNumber|clientName|total|dueDate)\s*}}/g, (_match, key) => values[key] || "");
+}
+
+function defaultInvoiceEmailTemplate() {
+  return [
+    "<p>Hello {{clientName}},</p>",
+    "<p>Please find attached invoice <strong>{{invoiceNumber}}</strong> for <strong>{{total}}</strong>.</p>",
+    "<p>Due date: <strong>{{dueDate}}</strong>.</p>"
+  ].join("");
 }

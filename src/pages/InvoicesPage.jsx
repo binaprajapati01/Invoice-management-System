@@ -10,12 +10,14 @@ import Skeleton from "../components/Skeleton.jsx";
 import api from "../lib/api.js";
 
 export default function InvoicesPage() {
-  const { invoices, loading, fetchInvoices, deleteInvoice, emailInvoice } = useAppStore();
+  const { invoices, loading, fetchInvoices, deleteInvoice } = useAppStore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState({ key: "createdAt", direction: "desc" });
   const [page, setPage] = useState(1);
   const [deleting, setDeleting] = useState(null);
+  const [emailing, setEmailing] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     fetchInvoices().catch((error) => toast.error(error.message));
@@ -73,6 +75,21 @@ export default function InvoicesPage() {
     }
   };
 
+  const sendEmail = async () => {
+    if (!emailing) return;
+    try {
+      setSendingEmail(true);
+      const { data } = await api.post(`/invoices/${emailing._id}/send-email`);
+      toast.success(data.message || "Email sent");
+      setEmailing(null);
+      await fetchInvoices();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Email send failed");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -108,7 +125,7 @@ export default function InvoicesPage() {
                         <Link className="secondary-btn px-3 py-2" to={`/invoices/${invoice._id}/edit`}><Pencil className="h-4 w-4" /></Link>
                         <button className="secondary-btn px-3 py-2" onClick={() => downloadPdf(invoice)}><Download className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2" onClick={() => handlePrint(invoice._id)}><Printer className="h-4 w-4" /></button>
-                        <button className="secondary-btn px-3 py-2" onClick={async () => { try { await emailInvoice(invoice._id, invoice.clientSnapshot?.email); toast.success("Invoice emailed"); } catch (error) { toast.error(error.message); } }}><Mail className="h-4 w-4" /></button>
+                        <button className="secondary-btn px-3 py-2" onClick={() => setEmailing(invoice)}><Mail className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(invoice)}><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
@@ -131,6 +148,17 @@ export default function InvoicesPage() {
           toast.error(error.message);
         }
       }} />
+      <ConfirmDialog
+        open={Boolean(emailing)}
+        title="Send invoice email"
+        description={`Send invoice #${emailing?.invoiceNumber} to ${emailing?.clientSnapshot?.email || "this client"}?`}
+        busy={sendingEmail}
+        confirmLabel="Send email"
+        busyLabel="Sending..."
+        tone="primary"
+        onCancel={() => setEmailing(null)}
+        onConfirm={sendEmail}
+      />
     </>
   );
 }
