@@ -15,13 +15,15 @@ const itemSchema = new mongoose.Schema(
 const invoiceSchema = new mongoose.Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true },
-    status: { type: String, enum: ["Draft", "Sent", "Paid", "Pending", "Overdue", "Cancelled"], default: "Draft" },
+    status: { type: String, enum: ["Draft", "Sent", "Paid", "Overdue", "Cancelled"], default: "Draft" },
     currency: { type: String, default: "USD" },
     client: { type: mongoose.Schema.Types.ObjectId, ref: "Client" },
     clientSnapshot: {
       name: String,
       email: String,
       address: String,
+      billingAddress: String,
+      shippingAddress: String,
       taxId: String
     },
     company: {
@@ -37,6 +39,8 @@ const invoiceSchema = new mongoose.Schema(
     discountTotal: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     paidAmount: { type: Number, default: 0 },
+    paymentMethod: { type: String, enum: ["Card", "Bank Transfer", "UPI", "Cash", "Other", ""], default: "" },
+    paymentStatus: { type: String, enum: ["Unpaid", "Partial", "Paid", "Failed"], default: "Unpaid" },
     dueDate: Date,
     issueDate: { type: Date, default: Date.now },
     paymentTerms: String,
@@ -52,6 +56,13 @@ const invoiceSchema = new mongoose.Schema(
     watermark: String,
     template: { type: mongoose.Schema.Types.ObjectId, ref: "Template" },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    history: [{
+      action: String,
+      status: String,
+      note: String,
+      by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      at: { type: Date, default: Date.now }
+    }],
     isDeleted: { type: Boolean, default: false },
     deletedAt: Date
   },

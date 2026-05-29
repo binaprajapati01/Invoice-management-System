@@ -19,7 +19,7 @@ const schema = z.object({
   htmlContent: z.string().optional()
 });
 
-const sampleData = {
+const fieldPreviewData = {
   "{{invoice.number}}": "INV-2025-00001",
   "{{invoice.date}}": "2025-01-15",
   "{{invoice.dueDate}}": "2025-01-30",
@@ -166,7 +166,7 @@ export default function TemplatesPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="premium-label">Preview</p>
-                <h3 className="mt-2 text-base font-black">Mock invoice</h3>
+              <h3 className="mt-2 text-base font-black">Field map</h3>
               </div>
               <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">Draft</span>
             </div>
@@ -293,5 +293,5 @@ function previewLabel(field) {
 }
 
 function renderSampleHtml(html) {
-  return Object.entries(sampleData).reduce((content, [key, value]) => content.replaceAll(key, value), html);
+  return Object.entries(fieldPreviewData).reduce((content, [key, value]) => content.replaceAll(key, value), html);
 }

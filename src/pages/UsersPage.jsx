@@ -64,7 +64,7 @@ export default function UsersPage({ type = "Manager" }) {
             <div key={group} className="premium-card">
               <LockKeyhole className="h-7 w-7 text-blue-600" />
               <h3 className="mt-4 text-lg font-bold">{group}</h3>
-              <p className="mt-2 text-sm text-slate-500">{["Managers can create, edit, export, email, and delete their invoices.", "Admins and managers can upload, map, preview, and publish templates.", "Super Admin controls admins, permissions, audit logs, and global settings."][index]}</p>
+              <p className="mt-2 text-sm text-slate-500">{["Managers can create, edit, export, email, and delete their invoices.", "Admins can upload, map, preview, and publish templates.", "Super Admin controls admins, permissions, audit logs, and global settings."][index]}</p>
             </div>
           ))}
         </div>

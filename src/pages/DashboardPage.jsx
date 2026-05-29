@@ -163,7 +163,7 @@ export default function DashboardPage() {
                   <div key={log._id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
                     <p className="text-sm font-bold">{log.actor?.name || "System"}</p>
                     <p className="mt-1 text-sm text-slate-500">{log.action}</p>
-                    <p className="mt-3 text-xs font-semibold text-blue-600">{log.entity} • {new Date(log.createdAt).toLocaleString()}</p>
+                    <p className="mt-3 text-xs font-semibold text-blue-600">{log.entity} - {new Date(log.createdAt).toLocaleString()}</p>
                   </div>
                 ))}
                 {!logs.length && <EmptyState icon={ClipboardCheck} title="No activity yet" description="Audit events appear here after users perform actions." />}

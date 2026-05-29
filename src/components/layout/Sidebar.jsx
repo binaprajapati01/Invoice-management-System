@@ -26,7 +26,6 @@ const roleNav = {
     ["Create Invoice", "/invoices/new", FilePlus2],
     ["Invoice History", "/invoices", Files],
     ["Clients", "/clients", Building2],
-    ["Templates", "/templates", FileClock],
     ["Payments", "/payments", CreditCard],
     ["Profile", "/profile", ShieldCheck]
   ]
@@ -41,9 +40,9 @@ export default function Sidebar({ mobileOpen = false, collapsed = false, onToggl
       {mobileOpen && <button className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-sm lg:hidden" onClick={onClose} aria-label="Close navigation overlay" />}
       <aside className={`fixed inset-y-0 left-0 z-40 border-r border-slate-200/70 bg-white/95 px-4 py-5 shadow-soft backdrop-blur-2xl transition-all dark:border-slate-800 dark:bg-slate-950/95 lg:translate-x-0 ${collapsed ? "lg:w-24" : "lg:w-[260px]"} ${mobileOpen ? "w-[260px] translate-x-0" : "w-[260px] -translate-x-full"}`}>
       <div className="flex items-center gap-3 px-2">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-lg font-black text-white shadow-glow">IF</div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-lg font-black text-white shadow-glow">WC</div>
         <div className={collapsed ? "lg:hidden" : ""}>
-          <p className="text-base font-extrabold tracking-tight">InvoiceFlow</p>
+          <p className="text-base font-extrabold tracking-tight">Web Cultivation</p>
           <p className="text-xs font-medium text-slate-500">Enterprise billing OS</p>
         </div>
         <button className="ml-auto grid h-10 w-10 place-items-center rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-900 lg:hidden" onClick={onClose} aria-label="Close navigation"><X className="h-5 w-5" /></button>

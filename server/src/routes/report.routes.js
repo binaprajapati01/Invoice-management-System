@@ -3,25 +3,24 @@ import Invoice from "../models/Invoice.js";
 import User from "../models/User.js";
 import Client from "../models/Client.js";
 import Payment from "../models/Payment.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { invoiceScopeFor } from "../utils/scope.js";
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireRole("Super Admin", "Admin"));
 
 router.get("/overview", asyncHandler(async (req, res) => {
   const scope = { ...invoiceScopeFor(req.user), isDeleted: { $ne: true } };
   const [invoices, users, clients, payments] = await Promise.all([
     Invoice.find(scope).lean(),
-    User.find().select("name email role createdAt isActive").lean(),
+    ["super admin", "admin"].includes(normalizeRole(req.user.role)) ? User.find().select("name email role createdAt isActive").lean() : Promise.resolve([]),
     Client.find(clientScopeFor(req.user)).lean(),
     Payment.find(paymentScopeFor(req.user)).populate("invoice", "createdBy total status").lean()
   ]);
   const paidInvoices = invoices.filter((invoice) => invoice.status === "Paid");
-  const admins = users.filter((user) => user.role === "Admin");
-  const managers = users.filter((user) => user.role === "Manager");
+  const admins = users.filter((user) => normalizeRole(user.role) === "admin");
+  const managers = users.filter((user) => normalizeRole(user.role) === "manager");
 
   res.json({
     kpis: {
@@ -30,10 +29,10 @@ router.get("/overview", asyncHandler(async (req, res) => {
       revenue: paidInvoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0),
       invoices: invoices.length,
       paid: paidInvoices.length,
-      unpaid: invoices.filter((invoice) => ["Sent", "Pending"].includes(invoice.status)).length,
+      unpaid: invoices.filter((invoice) => invoice.status === "Sent").length,
       overdue: invoices.filter((invoice) => invoice.status === "Overdue").length,
       draft: invoices.filter((invoice) => invoice.status === "Draft").length,
-      pending: invoices.filter((invoice) => ["Pending", "Sent", "Overdue"].includes(invoice.status)).length,
+      pending: invoices.filter((invoice) => ["Sent", "Overdue"].includes(invoice.status)).length,
       clients: clients.length,
       users: users.length,
       payments: payments.length
@@ -41,7 +40,7 @@ router.get("/overview", asyncHandler(async (req, res) => {
     revenueSeries: buildMonthlySeries(invoices, 12),
     sixMonthRevenue: buildMonthlySeries(invoices, 6),
     invoiceSeries: buildMonthlySeries(invoices, 12).map(({ month, invoices }) => ({ month, invoices })),
-    statusSeries: ["Paid", "Sent", "Pending", "Draft", "Overdue"].map((status) => ({
+    statusSeries: ["Paid", "Sent", "Draft", "Overdue", "Cancelled"].map((status) => ({
       name: status,
       value: invoices.filter((invoice) => invoice.status === status).length
     })),
@@ -50,7 +49,7 @@ router.get("/overview", asyncHandler(async (req, res) => {
       value: payments.filter((payment) => payment.method === method && payment.status === "Succeeded").reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
     })),
     topClients: topClients(invoices),
-    roleSeries: ["Super Admin", "Admin", "Manager"].map((role) => ({ role, users: users.filter((user) => user.role === role).length })),
+    roleSeries: ["Super Admin", "Admin", "Manager"].map((role) => ({ role, users: users.filter((user) => normalizeRole(user.role) === normalizeRole(role)).length })),
     managerPerformance: managers.map((manager) => {
       const managerInvoices = invoices.filter((invoice) => String(invoice.createdBy) === String(manager._id));
       return {
@@ -69,7 +68,7 @@ router.get("/revenue", asyncHandler(async (req, res) => {
 
 router.get("/invoices", asyncHandler(async (req, res) => {
   const invoices = await Invoice.find({ ...invoiceScopeFor(req.user), isDeleted: { $ne: true } }).lean();
-  res.json(["Paid", "Sent", "Pending", "Draft", "Overdue"].map((status) => ({ name: status, value: invoices.filter((invoice) => invoice.status === status).length })));
+  res.json(["Paid", "Sent", "Draft", "Overdue", "Cancelled"].map((status) => ({ name: status, value: invoices.filter((invoice) => invoice.status === status).length })));
 }));
 
 router.get("/clients", asyncHandler(async (req, res) => {
@@ -104,30 +103,29 @@ router.get("/export/csv", asyncHandler(async (req, res) => {
 
 router.get("/export/excel", asyncHandler(async (req, res) => {
   const rows = await getReportRows(req);
-  const tsv = [
-    ["Invoice Number", "Client Name", "Status", "Total", "Paid Amount", "Due Date", "Issue Date"],
-    ...rows.map((invoice) => [
-      invoice.invoiceNumber,
-      invoice.clientSnapshot?.name || invoice.client?.name || "",
-      invoice.status,
-      invoice.total,
-      invoice.paidAmount,
-      formatDate(invoice.dueDate),
-      formatDate(invoice.issueDate)
-    ])
-  ].map((row) => row.map(tsvEscape).join("\t")).join("\n");
+  const html = [
+    "<table>",
+    "<thead><tr><th>Invoice Number</th><th>Client Name</th><th>Status</th><th>Total</th><th>Paid Amount</th><th>Due Date</th><th>Issue Date</th></tr></thead>",
+    "<tbody>",
+    ...rows.map((invoice) => `<tr><td>${htmlEscape(invoice.invoiceNumber)}</td><td>${htmlEscape(invoice.clientSnapshot?.name || invoice.client?.name || "")}</td><td>${htmlEscape(invoice.status)}</td><td>${Number(invoice.total || 0)}</td><td>${Number(invoice.paidAmount || 0)}</td><td>${formatDate(invoice.dueDate)}</td><td>${formatDate(invoice.issueDate)}</td></tr>`),
+    "</tbody></table>"
+  ].join("");
 
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", "attachment; filename=invoices-report.xlsx");
-  res.send(tsv);
+  res.setHeader("Content-Type", "application/vnd.ms-excel");
+  res.setHeader("Content-Disposition", "attachment; filename=invoices-report.xls");
+  res.send(html);
 }));
 
 function clientScopeFor(user) {
-  return user.role === "Manager" ? { createdBy: user._id } : {};
+  return normalizeRole(user.role) === "manager" ? { createdBy: user._id } : {};
 }
 
 function paymentScopeFor(user) {
-  return user.role === "Manager" ? { recordedBy: user._id } : {};
+  return normalizeRole(user.role) === "manager" ? { recordedBy: user._id } : {};
+}
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function buildMonthlySeries(invoices, monthsBack) {
@@ -192,8 +190,12 @@ function csvEscape(value) {
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function tsvEscape(value) {
-  return String(value ?? "").replaceAll("\t", " ").replaceAll("\n", " ").replaceAll("\r", " ");
+function htmlEscape(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 export default router;

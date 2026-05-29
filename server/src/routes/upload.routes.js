@@ -12,7 +12,7 @@ router.post("/", requireAuth, upload.single("file"), asyncHandler(async (req, re
   const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
   if (!configureCloudinary()) return res.status(201).json({ url: dataUri, base64: dataUri });
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: `invoiceflow/${req.user.role.replaceAll(" ", "-").toLowerCase()}`,
+    folder: `webcultivation/${req.user.role.replaceAll(" ", "-").toLowerCase()}`,
     resource_type: "auto"
   });
   res.status(201).json({ url: result.secure_url, publicId: result.public_id });

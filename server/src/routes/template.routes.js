@@ -26,12 +26,12 @@ const templateSchema = z.object({
   isDefault: z.boolean().optional()
 });
 
-router.post("/", asyncHandler(async (req, res) => {
+router.post("/", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
   const template = await Template.create({ ...templateSchema.parse(req.body), createdBy: req.user._id });
   res.status(201).json(template);
 }));
 
-router.patch("/:id", asyncHandler(async (req, res) => {
+router.patch("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
   const template = await Template.findByIdAndUpdate(req.params.id, templateSchema.partial().parse(req.body), { new: true });
   if (!template) return res.status(404).json({ message: "Template not found" });
   res.json(template);

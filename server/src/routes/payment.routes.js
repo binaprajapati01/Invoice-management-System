@@ -3,13 +3,14 @@ import Payment from "../models/Payment.js";
 import Invoice from "../models/Invoice.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { invoiceScopeFor } from "../utils/scope.js";
 import { z } from "zod";
 
 const router = express.Router();
 router.use(requireAuth);
 
 router.get("/", asyncHandler(async (req, res) => {
-  const query = req.user.role === "Manager" ? { recordedBy: req.user._id } : {};
+  const query = normalizeRole(req.user.role) === "manager" ? { recordedBy: req.user._id } : {};
   if (req.query.status) query.status = req.query.status;
   if (req.query.method) query.method = req.query.method;
   if (req.query.from || req.query.to) {
@@ -29,14 +30,23 @@ router.post("/", asyncHandler(async (req, res) => {
     status: z.enum(["Succeeded", "Pending", "Failed"]).default("Succeeded"),
     transactionId: z.string().optional()
   }).parse(req.body);
+  const invoice = await Invoice.findOne({ _id: data.invoice, ...invoiceScopeFor(req.user), isDeleted: { $ne: true } });
+  if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+
   const payment = await Payment.create({ ...data, paidAt: data.status === "Succeeded" ? new Date() : undefined, recordedBy: req.user._id });
-  const invoice = await Invoice.findById(data.invoice);
   if (invoice) {
     if (data.status === "Succeeded") invoice.paidAmount = Number(invoice.paidAmount || 0) + Number(data.amount || 0);
-    invoice.status = invoice.paidAmount >= invoice.total ? "Paid" : "Pending";
+    invoice.paymentMethod = data.method;
+    invoice.paymentStatus = invoice.paidAmount >= invoice.total ? "Paid" : invoice.paidAmount > 0 ? "Partial" : "Unpaid";
+    if (data.status === "Succeeded") invoice.status = invoice.paidAmount >= invoice.total ? "Paid" : "Sent";
+    invoice.history.push({ action: "Payment recorded", status: invoice.status, note: `${data.method} ${data.status}`, by: req.user._id, at: new Date() });
     await invoice.save();
   }
   res.status(201).json(payment);
 }));
 
 export default router;
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase().replace(/\s+/g, " ");
+}

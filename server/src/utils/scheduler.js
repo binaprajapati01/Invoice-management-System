@@ -18,7 +18,7 @@ async function markOverdueInvoices() {
     const today = startOfToday();
     const invoices = await Invoice.find({
       isDeleted: false,
-      status: { $in: ["Sent", "Pending"] },
+      status: "Sent",
       dueDate: { $lt: today }
     });
 
@@ -58,7 +58,7 @@ async function sendDueSoonReminders() {
 
     const invoices = await Invoice.find({
       isDeleted: false,
-      status: { $in: ["Sent", "Pending"] },
+      status: "Sent",
       dueDate: { $gte: today, $lte: endOfDay(alertDate) }
     }).populate("client", "name email");
 

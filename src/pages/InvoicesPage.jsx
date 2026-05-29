@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Download, FilePlus2, Mail, Pencil, Printer, Search, Trash2 } from "lucide-react";
+import { Copy, Download, FilePlus2, Mail, Pencil, Printer, Search, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
 import { formatMoney } from "../lib/invoice.js";
@@ -10,7 +10,7 @@ import Skeleton from "../components/Skeleton.jsx";
 import api from "../lib/api.js";
 
 export default function InvoicesPage() {
-  const { invoices, loading, fetchInvoices, deleteInvoice } = useAppStore();
+  const { invoices, loading, fetchInvoices, deleteInvoice, duplicateInvoice } = useAppStore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState({ key: "createdAt", direction: "desc" });
@@ -52,7 +52,7 @@ export default function InvoicesPage() {
 
   const handlePrint = async (invoiceId) => {
     try {
-      const token = localStorage.getItem("invoiceflow_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
+      const token = localStorage.getItem("webcultivation_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`/api/invoices/${invoiceId}/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -104,7 +104,7 @@ export default function InvoicesPage() {
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input className="premium-input pl-12" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by invoice, client, status..." />
           </div>
-          <div className="md:w-52"><CustomSelect value={status} onChange={setStatus} options={["All", "Draft", "Sent", "Paid", "Pending", "Overdue", "Cancelled"]} /></div>
+          <div className="md:w-52"><CustomSelect value={status} onChange={setStatus} options={["All", "Draft", "Sent", "Paid", "Overdue", "Cancelled"]} /></div>
         </div>
         {loading.invoices ? <div className="pt-5"><Skeleton /></div> : (
           <div className="overflow-x-auto">
@@ -123,6 +123,14 @@ export default function InvoicesPage() {
                     <td>
                       <div className="flex gap-2">
                         <Link className="secondary-btn px-3 py-2" to={`/invoices/${invoice._id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                        <button className="secondary-btn px-3 py-2" onClick={async () => {
+                          try {
+                            const copy = await duplicateInvoice(invoice._id);
+                            toast.success(`Duplicated as ${copy.invoiceNumber}`);
+                          } catch (error) {
+                            toast.error(error.message);
+                          }
+                        }}><Copy className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2" onClick={() => downloadPdf(invoice)}><Download className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2" onClick={() => handlePrint(invoice._id)}><Printer className="h-4 w-4" /></button>
                         <button className="secondary-btn px-3 py-2" onClick={() => setEmailing(invoice)}><Mail className="h-4 w-4" /></button>
@@ -165,11 +173,11 @@ export default function InvoicesPage() {
 
 function Sortable({ label, sortKey, sort, setSort }) {
   const active = sort.key === sortKey;
-  return <th className="py-4"><button className="font-bold uppercase tracking-wide" onClick={() => setSort((current) => ({ key: sortKey, direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc" }))}>{label} {active ? (sort.direction === "asc" ? "↑" : "↓") : ""}</button></th>;
+  return <th className="py-4"><button className="font-bold uppercase tracking-wide" onClick={() => setSort((current) => ({ key: sortKey, direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc" }))}>{label} {active ? (sort.direction === "asc" ? "ASC" : "DESC") : ""}</button></th>;
 }
 
 function Pagination({ page, pageCount, total, onPage }) {
-  return <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 text-sm text-slate-500 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><span>{total} invoices • Page {page} of {pageCount}</span><div className="flex gap-2"><button className="secondary-btn px-3 py-2" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button><button className="secondary-btn px-3 py-2" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>Next</button></div></div>;
+  return <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 text-sm text-slate-500 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><span>{total} invoices - Page {page} of {pageCount}</span><div className="flex gap-2"><button className="secondary-btn px-3 py-2" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button><button className="secondary-btn px-3 py-2" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>Next</button></div></div>;
 }
 
 function compare(a, b, sort) {

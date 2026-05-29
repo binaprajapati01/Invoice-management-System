@@ -21,7 +21,7 @@ export function buildInvoicePdfBuffer(invoice) {
 
 function drawInvoice(doc, invoice) {
   doc.rect(0, 0, 595, 140).fill("#F8FAFC");
-  doc.fillColor("#111827").fontSize(24).font("Helvetica-Bold").text(invoice.company?.name || "InvoiceFlow", 48, 48);
+  doc.fillColor("#111827").fontSize(24).font("Helvetica-Bold").text(invoice.company?.name || "Web Cultivation", 48, 48);
   doc.fillColor("#2563EB").fontSize(34).text("INVOICE", 410, 44, { align: "right" });
   doc.fillColor("#64748B").fontSize(10).text(invoice.invoiceNumber, 410, 84, { align: "right" });
 
@@ -47,7 +47,10 @@ function drawInvoice(doc, invoice) {
   doc.font("Helvetica").fillColor("#111827");
   y += 24;
   invoice.items?.forEach((item) => {
-    const amount = Number(item.quantity || 0) * Number(item.price || 0);
+    const base = Number(item.quantity || 0) * Number(item.price || 0);
+    const discount = base * (Number(item.discount || 0) / 100);
+    const taxable = Math.max(base - discount, 0);
+    const amount = taxable + taxable * (Number(item.tax || 0) / 100);
     doc.text(item.name || "Service", 64, y, { width: 210 });
     doc.text(String(item.quantity || 0), 300, y);
     doc.text(`${invoice.currency} ${Number(item.price || 0).toFixed(2)}`, 350, y);

@@ -9,15 +9,15 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { createMailer } from "../config/mail.js";
 
 const router = express.Router();
-const signToken = (user) => jwt.sign(
+const signToken = (user, remember = true) => jwt.sign(
   { id: user._id, role: user.role, email: user.email },
   process.env.JWT_SECRET || "dev-secret",
-  { expiresIn: "7d" }
+  { expiresIn: remember ? (process.env.JWT_EXPIRES_IN || "7d") : "12h" }
 );
-const signRefreshToken = (user) => jwt.sign(
+const signRefreshToken = (user, remember = true) => jwt.sign(
   { id: user._id, role: user.role, email: user.email, type: "refresh" },
   process.env.JWT_SECRET || "dev-secret",
-  { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" }
+  { expiresIn: remember ? (process.env.JWT_REFRESH_EXPIRES_IN || "30d") : "12h" }
 );
 
 async function registerUser(req, res) {
@@ -35,19 +35,20 @@ router.post("/signup", asyncHandler(registerUser));
 router.post("/register", asyncHandler(registerUser));
 
 router.post("/login", asyncHandler(async (req, res) => {
-    const { email, password, role } = z.object({
+    const { email, password, role, remember } = z.object({
       email: z.string().email(),
       password: z.string().min(1),
-      role: z.enum(["Super Admin", "Admin", "Manager"]).optional()
+      role: z.enum(["Super Admin", "Admin", "Manager"]).optional(),
+      remember: z.boolean().optional().default(true)
     }).parse(req.body);
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) return res.status(401).json({ message: "Invalid credentials" });
     if (role && normalizeRole(role) !== normalizeRole(user.role)) return res.status(403).json({ message: `This account is not assigned to ${role}` });
     user.lastLogin = new Date();
-    user.refreshToken = signRefreshToken(user);
+    user.refreshToken = signRefreshToken(user, remember);
     await user.save();
     await logActivity({ user, ip: req.ip }, "Logged in", "User", user._id);
-    res.json({ token: signToken(user), refreshToken: user.refreshToken, user: safeUser(user) });
+    res.json({ token: signToken(user, remember), refreshToken: user.refreshToken, user: safeUser(user) });
 }));
 
 router.post("/refresh", asyncHandler(async (req, res) => {
@@ -86,8 +87,8 @@ router.post("/forgot-password", asyncHandler(async (req, res) => {
         await mailer.sendMail({
           from: process.env.SMTP_FROM || process.env.SMTP_USER,
           to: user.email,
-          subject: "InvoiceFlow password reset",
-          html: `<p>Hello ${user.name},</p><p>Your InvoiceFlow OTP is <strong>${user.otp}</strong>. It expires in 10 minutes.</p><p>Use this reset token after OTP verification: <code>${user.resetToken}</code></p>`
+          subject: "Web Cultivation password reset",
+          html: `<p>Hello ${user.name},</p><p>Your Web Cultivation OTP is <strong>${user.otp}</strong>. It expires in 10 minutes.</p>`
         });
       }
     }

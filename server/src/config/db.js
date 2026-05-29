@@ -3,9 +3,9 @@ import User from "../models/User.js";
 import Settings from "../models/Settings.js";
 
 const seedUsers = [
-  { name: "Sophia Carter", email: "super@invoiceflow.com", password: "password123", role: "Super Admin" },
-  { name: "Aarav Mehta", email: "admin@invoiceflow.com", password: "password123", role: "Admin" },
-  { name: "Maya Iyer", email: "manager@invoiceflow.com", password: "password123", role: "Manager" }
+  { name: "Sophia Carter", email: "super@webcultivation.com", password: "password123", role: "Super Admin" },
+  { name: "Aarav Mehta", email: "admin@webcultivation.com", password: "password123", role: "Admin" },
+  { name: "Maya Iyer", email: "manager@webcultivation.com", password: "password123", role: "Manager" }
 ];
 
 export default async function connectDB() {
@@ -19,16 +19,16 @@ export default async function connectDB() {
     console.log("MongoDB connected");
 
     const count = await User.countDocuments();
-    if (!count) {
+    if (!count && process.env.ALLOW_DEMO_SEED === "true") {
       await User.insertMany(seedUsers);
       await Settings.create({
-        companyName: "InvoiceFlow Global",
+        companyName: "Web Cultivation Global",
         currency: "USD",
         taxRate: 18,
         accentColor: "#2563EB",
         notifications: { email: true, payments: true, security: true }
       });
-      console.log("Seeded initial users: super/admin/manager @invoiceflow.com. Change default passwords before production use.");
+      console.log("Seeded demo users because ALLOW_DEMO_SEED=true. Change default passwords before production use.");
     }
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);

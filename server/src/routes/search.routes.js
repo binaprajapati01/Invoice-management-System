@@ -21,7 +21,7 @@ router.get("/", asyncHandler(async (req, res) => {
       $or: [{ invoiceNumber: regex }, { "clientSnapshot.name": regex }, { "clientSnapshot.email": regex }]
     }).limit(6).select("invoiceNumber clientSnapshot status total currency"),
     Client.find({ $or: [{ name: regex }, { email: regex }, { company: regex }] }).limit(6).select("name email company status"),
-    ["Super Admin", "Admin"].includes(req.user.role)
+    ["super admin", "admin"].includes(normalizeRole(req.user.role))
       ? User.find({ ...userScopeFor(req.user), $or: [{ name: regex }, { email: regex }, { role: regex }] }).limit(6).select("name email role isActive")
       : []
   ]);
@@ -37,11 +37,11 @@ router.get("/notifications", asyncHandler(async (req, res) => {
   const invoiceScope = invoiceScopeFor(req.user);
   const dueSoon = await Invoice.find({
     ...invoiceScope,
-    status: { $in: ["Sent", "Pending", "Overdue"] },
+    status: { $in: ["Sent", "Overdue"] },
     dueDate: { $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
   }).sort({ dueDate: 1 }).limit(8).select("invoiceNumber clientSnapshot status dueDate total currency");
 
-  const logItems = ["Super Admin", "Admin"].includes(req.user.role)
+  const logItems = ["super admin", "admin"].includes(normalizeRole(req.user.role))
     ? await ActivityLog.find().populate("actor", "name").sort({ createdAt: -1 }).limit(6)
     : [];
 
@@ -57,7 +57,7 @@ router.get("/notifications", asyncHandler(async (req, res) => {
     ...logItems.map((log) => ({
       id: log._id,
       title: log.action,
-      body: `${log.actor?.name || "System"} • ${log.entity}`,
+      body: `${log.actor?.name || "System"} - ${log.entity}`,
       href: "/logs",
       createdAt: log.createdAt,
       tone: "neutral"
@@ -66,3 +66,7 @@ router.get("/notifications", asyncHandler(async (req, res) => {
 }));
 
 export default router;
+
+function normalizeRole(role = "") {
+  return String(role).trim().toLowerCase().replace(/\s+/g, " ");
+}

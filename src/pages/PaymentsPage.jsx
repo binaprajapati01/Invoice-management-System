@@ -92,7 +92,7 @@ export default function PaymentsPage() {
                 </tbody>
               </table>
               <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm text-slate-500 dark:border-slate-800">
-                <span>{payments.length} payments • Page {page} of {pageCount}</span>
+                <span>{payments.length} payments - Page {page} of {pageCount}</span>
                 <div className="flex gap-2"><button className="secondary-btn px-3 py-2" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="secondary-btn px-3 py-2" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>Next</button></div>
               </div>
             </div>

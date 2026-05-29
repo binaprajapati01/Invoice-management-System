@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import { CustomSelect, PageHeader } from "../components/ui.jsx";
 import { useAppStore } from "../store/appStore.js";
 import Skeleton from "../components/Skeleton.jsx";
+import api from "../lib/api.js";
 
 const tabs = [
   ["profile", "Company Profile", Building2],
@@ -111,7 +112,7 @@ export default function SettingsPage() {
 
 function defaults(settings = {}) {
   return {
-    companyName: settings.companyName || "InvoiceFlow",
+    companyName: settings.companyName || "Web Cultivation",
     companyEmail: settings.companyEmail || "",
     companyPhone: settings.companyPhone || "",
     companyAddress: settings.companyAddress || "",
@@ -147,7 +148,7 @@ function InvoiceTab({ register, setValue, watch }) {
 
 function PaymentTab({ register, watch }) {
   const upi = watch("upiId") || "";
-  const qr = upi ? `upi://pay?pa=${upi}&pn=${encodeURIComponent(watch("companyName") || "InvoiceFlow")}` : "upi://pay";
+  const qr = upi ? `upi://pay?pa=${upi}&pn=${encodeURIComponent(watch("companyName") || "Web Cultivation")}` : "upi://pay";
   return <div className="grid gap-5 xl:grid-cols-[1fr_220px]"><div className="grid gap-4 md:grid-cols-2"><Input label="UPI ID" bind={register("upiId")} /><Input label="Account name" bind={register("bank.accountName")} /><Input label="Account number" bind={register("bank.accountNo")} /><Input label="IFSC" bind={register("bank.ifsc")} /><Input label="Bank name" bind={register("bank.bankName")} /><div className="grid grid-cols-2 gap-3 md:col-span-2"><Toggle label="UPI" bind={register("paymentMethods.UPI")} /><Toggle label="Cash" bind={register("paymentMethods.Cash")} /><Toggle label="Bank" bind={register("paymentMethods.Bank")} /><Toggle label="Card" bind={register("paymentMethods.Card")} /></div></div><div className="rounded-xl border border-slate-200 p-5 text-center dark:border-slate-800"><QRCodeSVG value={qr} size={160} includeMargin /><button type="button" className="secondary-btn mt-4 w-full rounded-xl" onClick={() => navigator.clipboard.writeText(upi).then(() => toast.success("UPI ID copied"))}><Copy className="h-4 w-4" /> Copy UPI</button></div></div>;
 }
 
@@ -156,7 +157,15 @@ function TaxTab({ register, setValue, watch }) {
 }
 
 function EmailTab({ register }) {
-  return <div className="grid gap-4 md:grid-cols-2"><Input label="SMTP host" bind={register("emailSettings.smtpHost")} /><Input label="SMTP port" type="number" bind={register("emailSettings.smtpPort")} /><Input label="SMTP user" bind={register("emailSettings.smtpUser")} /><Input label="SMTP password" type="password" bind={register("emailSettings.smtpPassword")} /><Input label="From name" bind={register("emailSettings.fromName")} /><Input label="From email" bind={register("emailSettings.fromEmail")} /><Input label="Subject template" bind={register("emailSettings.subjectTemplate")} /><label className="block md:col-span-2"><span className="premium-label">Body template</span><textarea className="premium-input mt-2 min-h-36 rounded-xl" {...register("emailSettings.bodyTemplate")} /></label><button type="button" className="secondary-btn rounded-xl md:col-span-2" onClick={() => toast.success("SMTP settings are ready to save")}>Test email</button></div>;
+  const sendTest = async () => {
+    try {
+      const { data } = await api.post("/settings/test-email");
+      toast.success(data.message || "Test email sent");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Test email failed");
+    }
+  };
+  return <div className="grid gap-4 md:grid-cols-2"><Input label="SMTP host" bind={register("emailSettings.smtpHost")} /><Input label="SMTP port" type="number" bind={register("emailSettings.smtpPort")} /><Input label="SMTP user" bind={register("emailSettings.smtpUser")} /><Input label="SMTP password" type="password" bind={register("emailSettings.smtpPassword")} /><Input label="From name" bind={register("emailSettings.fromName")} /><Input label="From email" bind={register("emailSettings.fromEmail")} /><Input label="Subject template" bind={register("emailSettings.subjectTemplate")} /><label className="block md:col-span-2"><span className="premium-label">Body template</span><textarea className="premium-input mt-2 min-h-36 rounded-xl" {...register("emailSettings.bodyTemplate")} /></label><button type="button" className="secondary-btn rounded-xl md:col-span-2" onClick={sendTest}>Test email</button></div>;
 }
 
 function NotificationsTab({ register }) {

@@ -51,7 +51,9 @@ export default function App() {
               <Route path="/invoices/new" element={<Page><InvoiceBuilderPage /></Page>} />
               <Route path="/invoices/:id/edit" element={<Page><InvoiceBuilderPage /></Page>} />
               <Route path="/clients" element={<Page><ClientsPage /></Page>} />
-              <Route path="/templates" element={<Page><TemplatesPage /></Page>} />
+              <Route element={<ProtectedRoute roles={["Super Admin", "Admin"]} />}>
+                <Route path="/templates" element={<Page><TemplatesPage /></Page>} />
+              </Route>
               <Route path="/reports" element={<Page><ReportsPage /></Page>} />
               <Route path="/analytics" element={<Page><ReportsPage /></Page>} />
               <Route path="/payments" element={<Page><PaymentsPage /></Page>} />

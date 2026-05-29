@@ -6,11 +6,11 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem("invoiceflow_user");
+    const raw = localStorage.getItem("webcultivation_user") || sessionStorage.getItem("webcultivation_user");
     return raw ? JSON.parse(raw) : null;
   });
-  const [token, setToken] = useState(() => localStorage.getItem("invoiceflow_token"));
-  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem("invoiceflow_refresh_token"));
+  const [token, setToken] = useState(() => localStorage.getItem("webcultivation_token") || sessionStorage.getItem("webcultivation_token"));
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem("webcultivation_refresh_token") || sessionStorage.getItem("webcultivation_refresh_token"));
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
@@ -20,13 +20,18 @@ export function AuthProvider({ children }) {
         return;
       }
       try {
-      const storedRefreshToken = localStorage.getItem("invoiceflow_refresh_token");
+      const rememberSession = Boolean(localStorage.getItem("webcultivation_refresh_token"));
+      const storedRefreshToken = localStorage.getItem("webcultivation_refresh_token") || sessionStorage.getItem("webcultivation_refresh_token");
+      if (!storedRefreshToken) throw new Error("Refresh token missing");
       const { data } = await api.post("/auth/refresh", { refreshToken: storedRefreshToken });
-      persist(data.user, data.token, data.refreshToken);
+      persist(data.user, data.token, data.refreshToken, rememberSession);
       } catch (_error) {
-        localStorage.removeItem("invoiceflow_user");
-        localStorage.removeItem("invoiceflow_token");
-        localStorage.removeItem("invoiceflow_refresh_token");
+        localStorage.removeItem("webcultivation_user");
+        localStorage.removeItem("webcultivation_token");
+        localStorage.removeItem("webcultivation_refresh_token");
+        sessionStorage.removeItem("webcultivation_user");
+        sessionStorage.removeItem("webcultivation_token");
+        sessionStorage.removeItem("webcultivation_refresh_token");
         setUser(null);
         setToken(null);
       } finally {
@@ -36,10 +41,10 @@ export function AuthProvider({ children }) {
     refresh();
   }, []);
 
-  const login = async ({ email, password, role }) => {
+  const login = async ({ email, password, role, remember = true }) => {
     try {
-      const { data } = await api.post("/auth/login", { email, password, role });
-      persist(data.user, data.token, data.refreshToken);
+      const { data } = await api.post("/auth/login", { email, password, role, remember });
+      persist(data.user, data.token, data.refreshToken, remember);
       toast.success(`Welcome back, ${data.user.name}`);
       return data.user;
     } catch (error) {
@@ -77,22 +82,31 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const persist = (nextUser, nextToken, nextRefreshToken = refreshToken) => {
+  const persist = (nextUser, nextToken, nextRefreshToken = refreshToken, remember = true) => {
     setUser(nextUser);
     setToken(nextToken);
     setRefreshToken(nextRefreshToken);
-    localStorage.setItem("invoiceflow_user", JSON.stringify(nextUser));
-    localStorage.setItem("invoiceflow_token", nextToken);
-    if (nextRefreshToken) localStorage.setItem("invoiceflow_refresh_token", nextRefreshToken);
+    const primary = remember ? localStorage : sessionStorage;
+    const secondary = remember ? sessionStorage : localStorage;
+    secondary.removeItem("webcultivation_user");
+    secondary.removeItem("webcultivation_token");
+    secondary.removeItem("webcultivation_refresh_token");
+    primary.setItem("webcultivation_user", JSON.stringify(nextUser));
+    primary.setItem("webcultivation_token", nextToken);
+    if (nextRefreshToken) primary.setItem("webcultivation_refresh_token", nextRefreshToken);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    api.post("/auth/logout").catch(() => {});
     setUser(null);
     setToken(null);
     setRefreshToken(null);
-    localStorage.removeItem("invoiceflow_user");
-    localStorage.removeItem("invoiceflow_token");
-    localStorage.removeItem("invoiceflow_refresh_token");
+    localStorage.removeItem("webcultivation_user");
+    localStorage.removeItem("webcultivation_token");
+    localStorage.removeItem("webcultivation_refresh_token");
+    sessionStorage.removeItem("webcultivation_user");
+    sessionStorage.removeItem("webcultivation_token");
+    sessionStorage.removeItem("webcultivation_refresh_token");
     toast.success("Signed out");
   };
 

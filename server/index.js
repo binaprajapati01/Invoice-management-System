@@ -43,7 +43,7 @@ app.use(morgan("dev"));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300 }));
 
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "InvoiceFlow API", time: new Date().toISOString() });
+  res.json({ status: "ok", service: "Web Cultivation API", time: new Date().toISOString() });
 });
 
 app.use("/api/auth", authRoutes);
@@ -62,6 +62,9 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/search", searchRoutes);
 
 app.use((err, _req, res, _next) => {
+  if (err.name === "ZodError") {
+    return res.status(400).json({ message: err.errors?.[0]?.message || "Validation failed", errors: err.errors });
+  }
   res.status(err.status || 500).json({ message: err.message || "Something went wrong" });
 });
 

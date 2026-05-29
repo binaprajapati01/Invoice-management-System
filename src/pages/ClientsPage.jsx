@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Building2, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, Eye, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
 import { CustomSelect, PageHeader, StatusBadge } from "../components/ui.jsx";
 import CrudModal from "../components/CrudModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import Skeleton from "../components/Skeleton.jsx";
+import api from "../lib/api.js";
+import { formatMoney } from "../lib/invoice.js";
 
 const clientSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -30,6 +32,7 @@ export default function ClientsPage() {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [history, setHistory] = useState(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -67,6 +70,14 @@ export default function ClientsPage() {
                   <p className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Currency: {client.currency}</p>
                 </div>
                 <div className="mt-5 flex gap-2">
+                  <button className="secondary-btn px-3 py-2" onClick={async () => {
+                    try {
+                      const { data } = await api.get(`/clients/${client._id}/invoices`);
+                      setHistory({ client, invoices: data });
+                    } catch (error) {
+                      toast.error(error.response?.data?.message || "Could not load invoice history");
+                    }
+                  }}><Eye className="h-4 w-4" /></button>
                   <button className="secondary-btn flex-1 px-3 py-2" onClick={() => { setEditing(client); setOpen(true); }}><Pencil className="h-4 w-4" /> Edit</button>
                   <button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(client)}><Trash2 className="h-4 w-4" /></button>
                 </div>
@@ -96,6 +107,24 @@ export default function ClientsPage() {
           toast.error(error.message);
         }
       }} />
+      <CrudModal open={Boolean(history)} title={`${history?.client?.company || history?.client?.name || "Client"} invoice history`} onClose={() => setHistory(null)}>
+        <div className="max-h-[60vh] overflow-auto">
+          <table className="premium-table min-w-[620px]">
+            <thead className="text-xs uppercase tracking-wide text-slate-500"><tr><th>Invoice</th><th>Status</th><th>Issue date</th><th>Total</th></tr></thead>
+            <tbody>
+              {(history?.invoices || []).map((invoice) => (
+                <tr key={invoice._id}>
+                  <td className="font-bold">{invoice.invoiceNumber}</td>
+                  <td><StatusBadge status={invoice.status} /></td>
+                  <td className="text-slate-500">{invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString() : ""}</td>
+                  <td className="font-bold">{formatMoney(invoice.total, invoice.currency)}</td>
+                </tr>
+              ))}
+              {history && !history.invoices.length && <tr><td colSpan="4" className="py-10 text-center text-slate-500">No invoices for this client yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </CrudModal>
     </>
   );
 }

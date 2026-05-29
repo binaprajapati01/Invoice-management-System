@@ -105,6 +105,13 @@ export const useAppStore = create((set, get) => ({
       await get().fetchReports();
     });
   },
+  async duplicateInvoice(id) {
+    return get().request("invoices", async () => {
+      const { data } = await api.post(`/invoices/${id}/duplicate`);
+      await Promise.all([get().fetchInvoices(), get().fetchReports()]);
+      return data;
+    });
+  },
   async emailInvoice(id, to) {
     return get().request("emailInvoice", async () => {
       const { data } = await api.post(`/invoices/${id}/send-email`, { to });

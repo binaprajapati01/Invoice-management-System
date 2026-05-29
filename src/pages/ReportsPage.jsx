@@ -19,7 +19,7 @@ export default function ReportsPage() {
 
   const downloadExport = async (type) => {
     try {
-      const extension = type === "csv" ? "csv" : "xlsx";
+      const extension = type === "csv" ? "csv" : "xls";
       const { data } = await api.get(`/reports/export/${type}`, { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([data]));
       const link = document.createElement("a");

@@ -42,7 +42,10 @@ export function renderTemplate(htmlContent = "", invoice) {
 
 function buildItemsTable(items, currency) {
   const rows = items.map((item) => {
-    const amount = Number(item.quantity || 0) * Number(item.price || 0);
+    const base = Number(item.quantity || 0) * Number(item.price || 0);
+    const discount = base * (Number(item.discount || 0) / 100);
+    const taxable = Math.max(base - discount, 0);
+    const amount = taxable + taxable * (Number(item.tax || 0) / 100);
     return `<tr>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb">${escapeHtml(item.name || "")}</td>
       <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${escapeHtml(item.quantity || 0)}</td>

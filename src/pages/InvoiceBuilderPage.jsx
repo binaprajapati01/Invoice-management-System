@@ -10,9 +10,10 @@ import { calculateInvoice, formatMoney } from "../lib/invoice.js";
 import { CustomSelect, PageHeader } from "../components/ui.jsx";
 import { useAppStore } from "../store/appStore.js";
 import CrudModal from "../components/CrudModal.jsx";
+import api from "../lib/api.js";
 
 const currencies = ["INR", "USD", "EUR", "GBP", "AED"];
-const statuses = ["Draft", "Sent", "Pending", "Paid", "Overdue"];
+const statuses = ["Draft", "Sent", "Paid", "Overdue", "Cancelled"];
 const emptyItem = { name: "", description: "", quantity: 1, price: 0, tax: 0, discount: 0 };
 
 export default function InvoiceBuilderPage() {
@@ -42,9 +43,11 @@ export default function InvoiceBuilderPage() {
     if (!settings || id) return;
     const due = new Date();
     due.setDate(due.getDate() + Number(settings.defaultDueDays || 15));
+    api.get("/invoices/next-number").then(({ data }) => {
+      setInvoice((current) => ({ ...current, invoiceNumber: current.invoiceNumber || data.invoiceNumber || "" }));
+    }).catch(() => {});
     setInvoice((current) => ({
       ...current,
-      invoiceNumber: current.invoiceNumber || generateInvoiceNumber(settings.invoicePrefix || "INV"),
       currency: settings.defaultCurrency || settings.currency || "INR",
       dueDate: due.toISOString().slice(0, 10),
       company: {
@@ -107,6 +110,8 @@ export default function InvoiceBuilderPage() {
         name: client.company || client.name,
         email: client.email,
         address: [client.address, client.city, client.state, client.country, client.pincode].filter(Boolean).join(", "),
+        billingAddress: [client.address, client.city, client.state, client.country, client.pincode].filter(Boolean).join(", "),
+        shippingAddress: [client.address, client.city, client.state, client.country, client.pincode].filter(Boolean).join(", "),
         taxId: client.GSTIN || client.taxId || client.panNumber || ""
       }
     }));
@@ -171,7 +176,7 @@ export default function InvoiceBuilderPage() {
     const saved = await persistInvoice(invoice.status);
     if (!saved?._id) return;
     try {
-      const token = localStorage.getItem("invoiceflow_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
+      const token = localStorage.getItem("webcultivation_token") || localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`/api/invoices/${saved._id}/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -191,6 +196,22 @@ export default function InvoiceBuilderPage() {
       };
     } catch (error) {
       toast.error(error.message || "Print failed");
+    }
+  };
+
+  const downloadPdf = async () => {
+    const saved = await persistInvoice(invoice.status);
+    if (!saved?._id) return;
+    try {
+      const { data } = await api.get(`/invoices/${saved._id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${saved.invoiceNumber || invoice.invoiceNumber}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "PDF download failed");
     }
   };
 
@@ -223,9 +244,10 @@ export default function InvoiceBuilderPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <CustomSelect label="Client" value={invoice.client || ""} onChange={selectClient} options={clients.map((client) => ({ label: client.company || client.name, value: client._id, icon: UsersRound }))} placeholder="Choose client" />
               <Input label="Client email" value={invoice.clientSnapshot.email} onChange={(value) => setField("clientSnapshot.email", value)} />
-              <Input label="Client name" value={invoice.clientSnapshot.name} onChange={(value) => setField("clientSnapshot.name", value)} />
-              <Input label="GST / Tax number" value={invoice.clientSnapshot.taxId} onChange={(value) => setField("clientSnapshot.taxId", value)} />
-              <TextArea label="Client address" value={invoice.clientSnapshot.address} onChange={(value) => setField("clientSnapshot.address", value)} />
+                <Input label="Client name" value={invoice.clientSnapshot.name} onChange={(value) => setField("clientSnapshot.name", value)} />
+                <Input label="GST / Tax number" value={invoice.clientSnapshot.taxId} onChange={(value) => setField("clientSnapshot.taxId", value)} />
+              <TextArea label="Billing address" value={invoice.clientSnapshot.billingAddress || invoice.clientSnapshot.address} onChange={(value) => { setField("clientSnapshot.billingAddress", value); setField("clientSnapshot.address", value); }} />
+              <TextArea label="Shipping address" value={invoice.clientSnapshot.shippingAddress} onChange={(value) => setField("clientSnapshot.shippingAddress", value)} />
               <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
                 <p className="premium-label">Add new client</p>
                 <div className="mt-3 grid gap-3">
@@ -267,6 +289,7 @@ export default function InvoiceBuilderPage() {
               <Input label="Account number" value={invoice.bank.accountNo} onChange={(value) => setField("bank.accountNo", value)} />
               <Input label="IFSC / Swift" value={invoice.bank.ifsc} onChange={(value) => setField("bank.ifsc", value)} />
               <Input label="Account name" value={invoice.bank.accountName} onChange={(value) => setField("bank.accountName", value)} />
+              <CustomSelect label="Payment method" value={invoice.paymentMethod || ""} onChange={(value) => setField("paymentMethod", value)} options={[{ label: "Not selected", value: "" }, "UPI", "Bank Transfer", "Card", "Cash", "Other"]} placeholder="Select payment method" />
               <div className="lg:col-span-2">
                 <p className="premium-label">Signature</p>
                 <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800">
@@ -284,9 +307,7 @@ export default function InvoiceBuilderPage() {
         <aside className="xl:sticky xl:top-24 xl:self-start">
           <InvoicePreview invoice={invoiceWithTotals} qrValue={qrValue} />
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <PDFDownloadLink className="secondary-btn rounded-xl" document={<InvoicePdf invoice={invoiceWithTotals} qrDataUrl={qrDataUrl} />} fileName={`${invoice.invoiceNumber || "invoice"}.pdf`}>
-              {({ loading: pdfLoading }) => <><Download className="h-4 w-4" /> {pdfLoading ? "Preparing" : "PDF"}</>}
-            </PDFDownloadLink>
+            <button className="secondary-btn rounded-xl" onClick={downloadPdf}><Download className="h-4 w-4" /> PDF</button>
             <button className="secondary-btn rounded-xl" onClick={handlePrint}><Printer className="h-4 w-4" /> Print</button>
             <button className="premium-btn rounded-xl" onClick={() => setEmailOpen(true)}><Mail className="h-4 w-4" /> Email</button>
           </div>
@@ -305,24 +326,21 @@ export default function InvoiceBuilderPage() {
 
 function buildInitialInvoice() {
   return {
-    invoiceNumber: generateInvoiceNumber("INV"),
+    invoiceNumber: "",
     currency: "INR",
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: "",
     status: "Draft",
     company: { name: "", email: "", address: "", logo: "", signature: "" },
     client: "",
-    clientSnapshot: { name: "", email: "", address: "", taxId: "" },
+    clientSnapshot: { name: "", email: "", address: "", billingAddress: "", shippingAddress: "", taxId: "" },
     items: [{ ...emptyItem }],
     notes: "",
     terms: "",
     bank: { accountName: "", accountNo: "", ifsc: "", bankName: "" },
-    qrPaymentUrl: ""
+    qrPaymentUrl: "",
+    paymentMethod: ""
   };
-}
-
-function generateInvoiceNumber(prefix) {
-  return `${prefix}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
 }
 
 function toDateInput(value) {

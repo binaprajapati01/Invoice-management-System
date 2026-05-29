@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import { ArrowRight, BadgeCheck, BriefcaseBusiness, Eye, EyeOff, KeyRound, Loader2, LockKeyhole, Mail, ShieldCheck, User, UserCog, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../state/AuthContext.jsx";
-import { CustomSelect } from "../components/ui.jsx";
 
 const roles = [
   { label: "Super Admin", value: "Super Admin", icon: ShieldCheck },
@@ -58,12 +57,12 @@ export default function AuthPage({ mode = "login" }) {
     }
     if (mode === "otp") {
       const data = await verifyOtp({ email: values.email, otp: otpDigits.join("") });
-      sessionStorage.setItem("invoiceflow_reset_token", data.resetToken);
+      sessionStorage.setItem("webcultivation_reset_token", data.resetToken);
       navigate("/reset-password");
       return;
     }
     if (mode === "reset") {
-      await resetPassword({ password: values.password, token: sessionStorage.getItem("invoiceflow_reset_token") });
+      await resetPassword({ password: values.password, token: sessionStorage.getItem("webcultivation_reset_token") });
       navigate("/login");
     }
   };
@@ -92,10 +91,6 @@ export default function AuthPage({ mode = "login" }) {
 
           {mode === "login" && (
             <RoleTiles value={role} onChange={(value) => setValue("role", value, { shouldValidate: true })} error={errors.role?.message} />
-          )}
-
-          {mode === "signup" && (
-            <CustomSelect label="Role" value={role} onChange={(value) => setValue("role", value, { shouldValidate: true })} options={roles} error={errors.role?.message} />
           )}
 
           {["login", "signup", "reset"].includes(mode) && (
@@ -164,7 +159,7 @@ export default function AuthPage({ mode = "login" }) {
 
         {["login", "signup"].includes(mode) && (
           <p className="mt-6 text-center text-sm text-slate-500">
-            {mode === "login" ? "New to InvoiceFlow?" : "Already have an account?"}{" "}
+            {mode === "login" ? "New to Web Cultivation?" : "Already have an account?"}{" "}
             <Link className="font-bold text-blue-600" to={mode === "login" ? "/signup" : "/login"}>{mode === "login" ? "Create account" : "Sign in"}</Link>
           </p>
         )}
@@ -206,7 +201,7 @@ function buildSchema(mode) {
     email: ["login", "signup", "forgot", "otp"].includes(mode) ? z.string().email("Enter a valid email") : z.string().optional(),
     password: ["login", "signup", "reset"].includes(mode) ? z.string().min(8, "Use at least 8 characters") : z.string().optional(),
     confirmPassword: ["signup", "reset"].includes(mode) ? z.string().min(8, "Confirm your password") : z.string().optional(),
-    role: ["login", "signup"].includes(mode) ? z.enum(["Super Admin", "Admin", "Manager"]) : z.string().optional(),
+    role: mode === "login" ? z.enum(["Super Admin", "Admin", "Manager"]) : z.string().optional(),
     otp: mode === "otp" ? z.string().length(6, "Enter the 6 digit OTP") : z.string().optional(),
     terms: mode === "signup" ? z.literal(true, { errorMap: () => ({ message: "Accept the terms to continue" }) }) : z.boolean().optional(),
     remember: z.boolean().optional()
@@ -221,10 +216,18 @@ function buildSchema(mode) {
 function Brand() {
   return (
     <div className="mb-8 flex items-center gap-3">
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-white shadow-glow"><KeyRound className="h-6 w-6" /></div>
+      <div className="h-12 w-12 flex-shrink-0">
+        <svg viewBox="0 0 310 310" xmlns="http://www.w3.org/2000/svg" width="48" height="48">
+          <polygon points="155,10 300,155 155,300 10,155" fill="#1a3580"/>
+          <polygon points="155,35 275,155 155,275 35,155" fill="#1e3fa0"/>
+          <polygon points="185,65 275,155 185,275 65,155" fill="#2347b5"/>
+          <text x="88" y="195" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="140" fill="white" textAnchor="middle" letterSpacing="-4">W</text>
+          <text x="218" y="172" fontFamily="Arial Black, sans-serif" fontWeight="900" fontSize="100" fill="#5b8ee6" textAnchor="middle">C</text>
+        </svg>
+      </div>
       <div>
-        <p className="text-xl font-black tracking-tight">InvoiceFlow</p>
-        <p className="text-sm text-slate-500">Fintech invoice platform</p>
+        <p className="text-xl font-black tracking-tight">Web Cultivation</p>
+        <p className="text-sm text-slate-500">Technology</p>
       </div>
     </div>
   );
@@ -285,7 +288,7 @@ function StrengthBar({ password }) {
 function copyFor(mode) {
   return {
     login: { eyebrow: "Secure login", title: "Welcome back", body: "Sign in to manage invoices, clients, payments, and analytics." },
-    signup: { eyebrow: "Create workspace", title: "Start with InvoiceFlow", body: "Create your first account and configure team access securely." },
+    signup: { eyebrow: "Create workspace", title: "Start with Web Cultivation", body: "Create your first account with manager-level access. Admins can promote or create team roles securely." },
     forgot: { eyebrow: "Password recovery", title: "Send reset OTP", body: "Enter your account email to receive a one-time password." },
     otp: { eyebrow: "Verification", title: "Enter OTP", body: "Use the six digit code delivered for this reset request." },
     reset: { eyebrow: "Reset password", title: "Create new password", body: "Choose a strong password to restore access." }
