@@ -19,6 +19,7 @@ import uploadRoutes from "./src/routes/upload.routes.js";
 import searchRoutes from "./src/routes/search.routes.js";
 import { startScheduler } from "./src/utils/scheduler.js";
 
+// ✅ Env check
 const required = ["MONGODB_URI", "JWT_SECRET"];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length) {
@@ -26,33 +27,46 @@ if (missing.length) {
   process.exit(1);
 }
 
-const app = express();
+const app = express();  // ✅ Sirf ek baar
 const PORT = process.env.PORT || 5000;
 
 await connectDB();
+
 if (process.env.NODE_ENV !== "test") {
   startScheduler();
   console.log("Schedulers started");
 }
 
-app.use(helmet());
+app.use(cors({
+  origin: function (origin, callback) {
+    const allowed = [
+      'https://invoice-management-system-peach.vercel.app',
+      'http://localhost:3000'
+    ]
+    // Vercel preview URLs allow karo
+    if (!origin || allowed.includes(origin) || origin.includes('vercel.app')) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
 
-app.use(cors({ 
-  origin: [
-    "http://localhost:5173",
-    "https://invoice-management-system-peach.vercel.app"  
-  ], 
-  credentials: true 
-}));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(helmet());
 app.use(morgan("dev"));
+app.use(express.json({ limit: "10mb" }));  // ✅ Sirf ek baar
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300 }));
 
+// ✅ Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "Web Cultivation API", time: new Date().toISOString() });
 });
 
+// ✅ Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/managers", managerRoutes);
 app.use("/api/users", userRoutes);
@@ -68,6 +82,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/search", searchRoutes);
 
+// ✅ Error handler
 app.use((err, _req, res, _next) => {
   if (err.name === "ZodError") {
     return res.status(400).json({ message: err.errors?.[0]?.message || "Validation failed", errors: err.errors });
@@ -75,5 +90,5 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ message: err.message || "Something went wrong" });
 });
 
-app.listen(PORT);
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 export default app;
