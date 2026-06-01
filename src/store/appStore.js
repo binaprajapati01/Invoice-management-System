@@ -43,6 +43,15 @@ export const useAppStore = create((set, get) => ({
       return data;
     });
   },
+  async updateUserPermission(id, hasAccess) {
+    return get().request("userPermission", async () => {
+      const { data } = await api.patch(`/users/${id}/permission`, { hasAccess });
+      set((state) => ({
+        users: state.users.map((user) => user._id === id ? { ...user, hasAccess: data.user?.hasAccess ?? hasAccess } : user)
+      }));
+      return data.user;
+    });
+  },
   async deleteUser(id) {
     return get().request("users", async () => {
       await api.delete(`/users/${id}`);

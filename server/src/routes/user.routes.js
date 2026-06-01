@@ -80,6 +80,18 @@ router.patch("/:id", permit("Super Admin", "Admin"), asyncHandler(async (req, re
     res.json(user);
 }));
 
+router.patch("/:id/permission", permit("Super Admin", "Admin"), asyncHandler(async (req, res) => {
+    const updates = z.object({
+      hasAccess: z.boolean()
+    }).parse(req.body);
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User not found" });
+    if (!canManageUser(req.user.role, target.role)) return res.status(403).json({ message: "Cannot edit this user" });
+    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select("-password");
+    await logActivity(req, updates.hasAccess ? "Enabled account access" : "Disabled account access", "User", req.params.id);
+    res.json({ success: true, user });
+}));
+
 router.delete("/:id", requireRole("Super Admin", "Admin"), asyncHandler(async (req, res) => {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found" });

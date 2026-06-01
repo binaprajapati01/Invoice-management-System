@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema(
     phone: String,
     department: String,
     permissions: [{ type: String }],
+    hasAccess: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     lastLogin: Date,
     otp: String,

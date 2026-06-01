@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { LockKeyhole, Plus, ShieldCheck, Trash2, UserCog } from "lucide-react";
+import { LockKeyhole, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAppStore } from "../store/appStore.js";
-import { CustomSelect, PageHeader, SearchBar, StatusBadge } from "../components/ui.jsx";
+import { CustomSelect, PageHeader, SearchBar } from "../components/ui.jsx";
+import AccountsTable from "../components/AccountsTable.jsx";
 import CrudModal from "../components/CrudModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import Skeleton from "../components/Skeleton.jsx";
@@ -21,7 +22,7 @@ const schema = z.object({
 });
 
 export default function UsersPage({ type = "Manager" }) {
-  const { users, loading, fetchUsers, saveUser, deleteUser, deleteManager } = useAppStore();
+  const { users, loading, fetchUsers, saveUser, updateUserPermission, deleteUser, deleteManager } = useAppStore();
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [open, setOpen] = useState(false);
@@ -55,7 +56,7 @@ export default function UsersPage({ type = "Manager" }) {
         eyebrow={type === "Permissions" ? "RBAC" : "Team management"}
         title={type === "Permissions" ? "Permission Management" : `${type} Management`}
         description="Create accounts, review activity, control permissions, and deactivate access from a secure operational view."
-        action={type !== "Permissions" && <button className="premium-btn" onClick={() => openForm()}><Plus className="h-4 w-4" /> Add {type}</button>}
+        action={type !== "Permissions" && <button className="premium-btn w-full sm:w-auto" onClick={() => openForm()}><Plus className="h-4 w-4" /> Add {type}</button>}
       />
 
       {type === "Permissions" && (
@@ -76,30 +77,27 @@ export default function UsersPage({ type = "Manager" }) {
           <SearchBar value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search accounts..." />
         </div>
         {loading.users ? <div className="p-5"><Skeleton /></div> : (
-          <div className="overflow-x-auto">
-            <table className="premium-table min-w-[760px]">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/60">
-                <tr><Sortable label="User" sortKey="name" sort={sort} setSort={setSort} /><Sortable label="Role" sortKey="role" sort={sort} setSort={setSort} /><th>Status</th><th>Permissions</th><Sortable label="Last login" sortKey="lastLogin" sort={sort} setSort={setSort} /><th></th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {rows.map((user) => (
-                  <tr key={user._id}>
-                    <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 font-bold text-blue-600 dark:bg-blue-500/10">{user.name?.[0]}</div><div><p className="font-bold">{user.name}</p><p className="text-xs text-slate-500">{user.email}</p></div></div></td>
-                    <td>{user.role}</td>
-                    <td><StatusBadge status={user.isActive ? "Active" : "Inactive"} /></td>
-                    <td><span className="inline-flex items-center gap-2 text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-500" /> Scoped access</span></td>
-                    <td className="text-slate-500">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}</td>
-                    <td className="pr-5"><div className="flex justify-end gap-2"><button className="secondary-btn px-3 py-2" onClick={() => openForm(user)}><UserCog className="h-4 w-4" /> Edit</button><button className="secondary-btn px-3 py-2 text-rose-500" onClick={() => setDeleting(user)}><Trash2 className="h-4 w-4" /> Delete</button></div></td>
-                  </tr>
-                ))}
-                {!filtered.length && <tr><td colSpan="6" className="px-5 py-10 text-center text-slate-500">No accounts found.</td></tr>}
-              </tbody>
-            </table>
-            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-4 text-sm text-slate-500 dark:border-slate-800">
-              <span>{filtered.length} accounts - Page {page} of {pageCount}</span>
-              <div className="flex gap-2"><button className="secondary-btn px-3 py-2" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="secondary-btn px-3 py-2" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>Next</button></div>
-            </div>
-          </div>
+          <AccountsTable
+            accounts={rows}
+            filteredCount={filtered.length}
+            page={page}
+            pageCount={pageCount}
+            sort={sort}
+            setSort={setSort}
+            onEdit={openForm}
+            onDelete={setDeleting}
+            onPermissionToggle={async (id, hasAccess) => {
+              try {
+                await updateUserPermission(id, hasAccess);
+                toast.success(hasAccess ? "Access enabled" : "Access disabled");
+              } catch (error) {
+                toast.error(error.message);
+                throw error;
+              }
+            }}
+            onPreviousPage={() => setPage(page - 1)}
+            onNextPage={() => setPage(page + 1)}
+          />
         )}
       </div>
 
@@ -160,11 +158,6 @@ function UserFormModal({ open, user, defaultRole, onClose, onSave }) {
 
 function Field({ label, error, children }) {
   return <label className="block"><span className="premium-label">{label}</span><div className="mt-2">{children}</div>{error && <span className="mt-1 block text-xs font-semibold text-rose-500">{error}</span>}</label>;
-}
-
-function Sortable({ label, sortKey, sort, setSort }) {
-  const active = sort.key === sortKey;
-  return <th className="px-5 py-4"><button className="font-bold uppercase tracking-wide" onClick={() => setSort((current) => ({ key: sortKey, direction: current.key === sortKey && current.direction === "asc" ? "desc" : "asc" }))}>{label} {active ? (sort.direction === "asc" ? "ASC" : "DESC") : ""}</button></th>;
 }
 
 function compare(a, b, sort) {
