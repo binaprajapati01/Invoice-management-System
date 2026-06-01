@@ -40,8 +40,8 @@ if (process.env.NODE_ENV !== "test") {
 app.use(cors({
   origin: function (origin, callback) {
     const allowed = [
-      'https://invoice-management-system-peach.vercel.app',
-      'http://localhost:3000'
+      'http://localhost:5173',
+    'https://invoice-management-system-dv1zkinf9-binaprajapati01s-projects.vercel.app',
     ]
     // Vercel preview URLs allow karo
     if (!origin || allowed.includes(origin) || origin.includes('vercel.app')) {
