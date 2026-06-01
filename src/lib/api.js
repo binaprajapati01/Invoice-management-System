@@ -6,12 +6,17 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = 
-    localStorage.getItem("webcultivation_token") || 
-    sessionStorage.getItem("webcultivation_token") || 
-    localStorage.getItem("token") || 
+  // /api prefix automatically add karo
+  if (config.url && !config.url.startsWith('/api')) {
+    config.url = '/api' + config.url;
+  }
+
+  const token =
+    localStorage.getItem("webcultivation_token") ||
+    sessionStorage.getItem("webcultivation_token") ||
+    localStorage.getItem("token") ||
     sessionStorage.getItem("token");
-    
+
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
