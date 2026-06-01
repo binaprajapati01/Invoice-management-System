@@ -1,16 +1,11 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   withCredentials: true
 });
 
 api.interceptors.request.use((config) => {
-  
-  if (config.url && !config.url.startsWith('/api')) {
-    config.url = '/api' + config.url;
-  }
-
   const token = 
     localStorage.getItem("webcultivation_token") || 
     sessionStorage.getItem("webcultivation_token") || 
