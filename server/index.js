@@ -37,23 +37,12 @@ if (process.env.NODE_ENV !== "test") {
   console.log("Schedulers started");
 }
 
-app.use(cors({
-  origin: function (origin, callback) {
-    const allowed = [
-      'http://localhost:5173',
-    'https://invoice-management-system-dv1zkinf9-binaprajapati01s-projects.vercel.app',
-    ]
-    // Vercel preview URLs allow karo
-    if (!origin || allowed.includes(origin) || origin.includes('vercel.app')) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
+app.use(cors({ 
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}))
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 app.use(helmet());
 app.use(morgan("dev"));
